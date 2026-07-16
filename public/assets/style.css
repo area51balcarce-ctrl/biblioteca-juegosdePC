@@ -1,0 +1,121 @@
+/* =========================================================
+   ÁREA 51 — Sistema de diseño
+   Concepto: terminal de archivo clasificado / HUD de vigilancia.
+   Fondo casi negro, retícula sutil, verde fósforo como señal de
+   "acceso concedido", tipografía técnica con tracking amplio.
+   ========================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+:root{
+  --bg:            #07090a;
+  --bg-elev:       #0d1211;
+  --bg-panel:      #111716;
+  --bg-panel-2:    #151c1a;
+  --line:          #223029;
+  --line-bright:   #2f4238;
+  --text:          #e9f2ec;
+  --text-dim:      #90a49b;
+  --text-faint:    #5c6d65;
+  --accent:        #39ff9d;
+  --accent-soft:   rgba(57,255,157,.14);
+  --accent-dim:    #1f8f61;
+  --warn:          #ffb020;
+  --danger:        #ff5b5b;
+
+  --f-display: 'Chakra Petch', sans-serif;
+  --f-mono:    'IBM Plex Mono', monospace;
+  --f-body:    'IBM Plex Sans', sans-serif;
+
+  --radius: 2px;
+}
+
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--f-body);
+  font-size:15px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---- Textura de fondo: retícula + viñeta + ruido leve ---- */
+.a51-scanbg{
+  position:fixed; inset:0; z-index:-1; pointer-events:none;
+  background:
+    radial-gradient(ellipse at 20% -10%, rgba(57,255,157,.06), transparent 45%),
+    radial-gradient(ellipse at 100% 110%, rgba(31,143,97,.08), transparent 50%),
+    repeating-linear-gradient(0deg, rgba(57,255,157,.025) 0px, rgba(57,255,157,.025) 1px, transparent 1px, transparent 34px),
+    repeating-linear-gradient(90deg, rgba(57,255,157,.025) 0px, rgba(57,255,157,.025) 1px, transparent 1px, transparent 34px),
+    var(--bg);
+}
+.a51-scanbg::after{
+  content:"";
+  position:absolute; inset:0;
+  background:repeating-linear-gradient(0deg, rgba(0,0,0,0) 0, rgba(0,0,0,0) 2px, rgba(0,0,0,.12) 3px);
+  mix-blend-mode:multiply;
+  animation:scan-drift 9s linear infinite;
+}
+@keyframes scan-drift{ 0%{background-position-y:0} 100%{background-position-y:120px} }
+
+/* ---- Tipografía ---- */
+h1,h2,h3,h4{ font-family:var(--f-display); font-weight:600; margin:0; letter-spacing:.01em; }
+.eyebrow{
+  font-family:var(--f-mono); font-size:11px; letter-spacing:.22em; text-transform:uppercase;
+  color:var(--accent); display:flex; align-items:center; gap:8px;
+}
+.eyebrow::before{ content:""; width:6px; height:6px; background:var(--accent); box-shadow:0 0 8px var(--accent); display:inline-block; animation:pulse 1.6s ease-in-out infinite; }
+@keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.35} }
+.mono{ font-family:var(--f-mono); }
+a{ color:var(--accent); text-decoration:none; }
+
+/* ---- Header global ---- */
+.a51-header{
+  border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg, rgba(13,18,17,.9), rgba(13,18,17,.6));
+  backdrop-filter:blur(6px);
+  padding:16px clamp(20px,5vw,64px);
+  display:flex; align-items:center; justify-content:space-between;
+  position:sticky; top:0; z-index:20;
+}
+.a51-brand{ display:flex; align-items:center; gap:10px; font-family:var(--f-display); font-weight:700; font-size:18px; letter-spacing:.06em; }
+.a51-brand .dot{ width:9px; height:9px; border-radius:50%; background:var(--accent); box-shadow:0 0 10px var(--accent); }
+.a51-tag{ font-family:var(--f-mono); font-size:11px; color:var(--text-faint); letter-spacing:.14em; }
+
+/* ---- Botones ---- */
+.btn{
+  font-family:var(--f-mono); font-size:12.5px; letter-spacing:.12em; text-transform:uppercase;
+  padding:12px 20px; border:1px solid var(--line-bright); background:transparent; color:var(--text);
+  cursor:pointer; display:inline-flex; align-items:center; gap:10px; border-radius:var(--radius);
+  transition:border-color .15s ease, background .15s ease, transform .1s ease;
+}
+.btn:hover{ border-color:var(--accent); background:var(--accent-soft); }
+.btn:active{ transform:translateY(1px); }
+.btn-primary{ background:var(--accent); border-color:var(--accent); color:#04140c; font-weight:600; }
+.btn-primary:hover{ background:#5dffb3; border-color:#5dffb3; }
+.btn-block{ width:100%; justify-content:center; }
+.btn[disabled]{ opacity:.35; cursor:not-allowed; }
+
+/* ---- Corner bracket frame (motivo HUD) ---- */
+.bracket-frame{ position:relative; }
+.bracket-frame::before,.bracket-frame::after,
+.bracket-frame .bf-tr,.bracket-frame .bf-bl{
+  content:""; position:absolute; width:18px; height:18px; border-color:var(--accent); opacity:.8;
+}
+.bracket-frame::before{ top:-1px; left:-1px; border-top:2px solid var(--accent); border-left:2px solid var(--accent); }
+.bracket-frame::after{ bottom:-1px; right:-1px; border-bottom:2px solid var(--accent); border-right:2px solid var(--accent); }
+
+/* ---- Card / panel ---- */
+.panel{ background:var(--bg-panel); border:1px solid var(--line); border-radius:var(--radius); }
+
+/* ---- Badges de estado ---- */
+.badge{ font-family:var(--f-mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; padding:4px 10px; border-radius:2px; display:inline-flex; align-items:center; gap:6px; }
+.badge-ok{ color:var(--accent); border:1px solid var(--accent-dim); background:var(--accent-soft); }
+.badge-warn{ color:var(--warn); border:1px solid #6b4d15; background:rgba(255,176,32,.08); }
+.badge-off{ color:var(--text-faint); border:1px solid var(--line); }
+
+::selection{ background:var(--accent); color:#04140c; }
+
+.container{ max-width:1180px; margin:0 auto; padding:0 clamp(20px,5vw,64px); }

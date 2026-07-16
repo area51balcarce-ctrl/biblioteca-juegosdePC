@@ -1,0 +1,35 @@
+AREA 51 BIBLIOTECA - PASOS UNICOS
+
+1) SUBIR A GITHUB
+Subi TODO el contenido de esta carpeta a la raiz del repositorio.
+No hay package-lock.json, node_modules ni dist para subir.
+
+2) SUPABASE
+- Crear un proyecto.
+- SQL Editor > New query.
+- Abrir supabase/SETUP_COMPLETO.sql, copiar todo y ejecutar Run.
+- Authentication > Users > Add user. Crear tu email y contraseña.
+- Volver a SQL Editor y ejecutar reemplazando los valores:
+
+insert into public.admin_users (id,email,role)
+select id,email,'admin' from auth.users where email='TU_EMAIL_AQUI'
+on conflict (id) do update set role='admin', email=excluded.email;
+
+3) CLAVES DE SUPABASE
+En Supabase: Project Settings > API
+- Project URL  -> SUPABASE_URL
+- anon public o publishable key -> SUPABASE_ANON_KEY
+NO usar service_role.
+
+4) VERCEL
+Proyecto > Settings > Environment Variables
+Crear exactamente:
+SUPABASE_URL = la Project URL
+SUPABASE_ANON_KEY = la anon public/publishable key
+Marcar Production, Preview y Development.
+Despues hacer un deploy nuevo.
+
+5) USO
+Panel: https://TU-DOMINIO/admin
+Cargas producto, portada y archivo; elegis Publicado.
+Copias el enlace y se lo envias al cliente.

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Acceso — Panel ÁREA 51</title>
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  body{ min-height:100vh; display:flex; align-items:center; justify-content:center; }
+  .login-wrap{ width:100%; max-width:400px; padding:20px; }
+  .login-card{ padding:40px 36px 34px; position:relative; }
+  .login-head{ margin-bottom:28px; text-align:center; }
+  .login-head .a51-brand{ justify-content:center; font-size:22px; margin-bottom:8px; }
+  .login-head p{ font-family:var(--f-mono); font-size:11px; color:var(--text-faint); letter-spacing:.14em; text-transform:uppercase; }
+  label{ font-family:var(--f-mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--text-dim); display:block; margin-bottom:8px; }
+  .field{ margin-bottom:20px; }
+  input{
+    width:100%; background:var(--bg-elev); border:1px solid var(--line-bright); color:var(--text);
+    padding:12px 14px; font-family:var(--f-mono); font-size:14px; border-radius:2px; outline:none;
+  }
+  input:focus{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  input:disabled{ opacity:.6; }
+  .cursor-line{ display:inline-block; width:8px; height:14px; background:var(--accent); animation:pulse 1s steps(2) infinite; vertical-align:-2px; }
+  .status-line{ font-family:var(--f-mono); font-size:11px; color:var(--text-faint); margin-top:22px; text-align:center; letter-spacing:.05em; }
+  .footnote{ text-align:center; margin-top:26px; font-family:var(--f-mono); font-size:10.5px; color:var(--text-faint); }
+  .form-error{
+    display:none; font-family:var(--f-mono); font-size:12px; color:#ff8080;
+    background:rgba(255,93,93,.08); border:1px solid rgba(255,93,93,.35); border-radius:2px;
+    padding:10px 12px; margin-bottom:18px;
+  }
+  .form-error.show{ display:block; }
+  button[type=submit]:disabled{ opacity:.6; cursor:default; }
+</style>
+</head>
+<body>
+<div class="a51-scanbg"></div>
+<div class="login-wrap">
+  <div class="panel login-card bracket-frame">
+    <div class="login-head">
+      <div class="a51-brand"><span class="dot"></span> ÁREA&nbsp;51</div>
+      <p>Panel de administración <span class="cursor-line"></span></p>
+    </div>
+    <div class="form-error" id="form-error"></div>
+    <form id="login-form">
+      <div class="field">
+        <label for="email">Usuario</label>
+        <input id="email" type="email" placeholder="kevin@area51" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="pass">Contraseña</label>
+        <input id="pass" type="password" placeholder="••••••••••••" autocomplete="current-password" required>
+      </div>
+      <button class="btn btn-primary btn-block" type="submit" id="submit-btn">Ingresar al panel →</button>
+    </form>
+    <div class="status-line" id="status-line">CONEXIÓN CIFRADA · SUPABASE AUTH</div>
+  </div>
+  <div class="footnote">Acceso restringido — solo administradores autorizados</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/store.js"></script>
+<script>
+  const form = document.getElementById('login-form');
+  const errorBox = document.getElementById('form-error');
+  const submitBtn = document.getElementById('submit-btn');
+  const statusLine = document.getElementById('status-line');
+
+  function showError(message){
+    errorBox.textContent = message;
+    errorBox.classList.add('show');
+  }
+  function hideError(){
+    errorBox.classList.remove('show');
+  }
+
+  // Si ya hay una sesión activa, no tiene sentido mostrar el login de nuevo.
+  (async () => {
+    const session = await a51_getSession();
+    if(session){ const admin=await a51_getCurrentAdmin(); if(admin) window.location.href='dashboard.html'; else await a51_signOut(); }
+  })();
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideError();
+    const email = document.getElementById('email').value.trim();
+    const pass = document.getElementById('pass').value;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Verificando…';
+    statusLine.textContent = 'CONECTANDO CON SUPABASE…';
+
+    const result = await a51_signIn(email, pass);
+
+    if(!result.ok){
+      showError(result.message);
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Ingresar al panel →';
+      statusLine.textContent = 'CONEXIÓN CIFRADA · SUPABASE AUTH';
+      return;
+    }
+
+    const admin = await a51_getCurrentAdmin();
+    if(!admin){
+      await a51_signOut();
+      showError('Esta cuenta no tiene permisos de administrador.');
+      submitBtn.disabled=false; submitBtn.textContent='Ingresar al panel →';
+      statusLine.textContent='ACCESO DENEGADO';
+      return;
+    }
+    statusLine.textContent = 'ACCESO CONCEDIDO — REDIRIGIENDO…';
+    window.location.href = 'dashboard.html';
+  });
+</script>
+</body>
+</html>
