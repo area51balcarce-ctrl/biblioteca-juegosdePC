@@ -1,9 +1,0 @@
-{
-  "name": "area51-biblioteca",
-  "private": true,
-  "version": "2.0.0",
-  "description": "Biblioteca digital privada de AREA 51",
-  "scripts": {
-    "build": "node scripts/build.js"
-  }
-}
