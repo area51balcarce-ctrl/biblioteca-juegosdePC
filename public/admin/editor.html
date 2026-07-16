@@ -50,6 +50,22 @@
   }
   .form-error.show{ display:block; }
   button:disabled{ opacity:.6; cursor:default; }
+
+  .smart-box{ border:1px solid var(--line-bright); background:rgba(54,255,148,.035); padding:18px; border-radius:2px; }
+  .smart-row{ display:grid; grid-template-columns:1fr auto; gap:10px; align-items:end; }
+  .smart-status{ font-family:var(--f-mono); font-size:11px; color:var(--text-faint); margin-top:10px; min-height:16px; }
+  .smart-status.ok{ color:var(--accent); }
+  .smart-status.error{ color:#ff8080; }
+  .search-results{ display:grid; gap:8px; margin-top:14px; }
+  .search-result{ width:100%; display:grid; grid-template-columns:62px 1fr auto; gap:12px; align-items:center; text-align:left; padding:9px; background:var(--bg-elev); color:var(--text); border:1px solid var(--line); cursor:pointer; }
+  .search-result:hover{ border-color:var(--accent); background:var(--accent-soft); }
+  .search-result img{ width:62px; height:42px; object-fit:cover; background:var(--bg); }
+  .search-result strong{ display:block; font-size:13px; }
+  .search-result small{ display:block; margin-top:3px; color:var(--text-faint); font-family:var(--f-mono); font-size:10px; }
+  .search-result .pick{ color:var(--accent); font-family:var(--f-mono); font-size:11px; }
+  .cover-preview{ display:none; margin-top:10px; width:220px; max-height:130px; object-fit:cover; border:1px solid var(--line-bright); }
+  .cover-preview.show{ display:block; }
+  @media (max-width:680px){ .smart-row{ grid-template-columns:1fr; } .search-result{ grid-template-columns:54px 1fr; } .search-result .pick{ display:none; } }
 </style>
 </head>
 <body>
@@ -69,6 +85,23 @@
     <div class="form-error" id="form-error"></div>
 
     <form id="game-form">
+
+      <div class="section" id="smart-section">
+        <h2>Carga inteligente</h2>
+        <div class="smart-box">
+          <div class="smart-row">
+            <div class="field" style="margin:0">
+              <label for="smart-query">Nombre del juego</label>
+              <input type="text" id="smart-query" placeholder="Ej: Pro Evolution Soccer 2016" autocomplete="off">
+            </div>
+            <button type="button" class="btn btn-primary" id="smart-search-btn">Buscar y completar</button>
+          </div>
+          <div class="hint">Busca la ficha, requisitos, idiomas y portada. Todo queda editable antes de guardar.</div>
+          <div class="smart-status" id="smart-status"></div>
+          <div class="search-results" id="search-results"></div>
+        </div>
+      </div>
+
       <div class="section">
         <h2>Identificación</h2>
         <div class="grid-2">
@@ -138,6 +171,7 @@
         <div class="field">
           <label for="cover">Portada (imagen)</label>
           <div class="file-row"><input type="file" id="cover" accept="image/*"><span class="file-status" id="cover-status">sin archivo</span></div>
+          <img id="cover-preview" class="cover-preview" alt="Vista previa de portada">
         </div>
         <div class="field">
           <label for="mainFile">Archivo principal</label>
@@ -170,6 +204,8 @@
   const params = new URLSearchParams(location.search);
   const editSlug = params.get('slug');
   let currentProduct = null;
+  let autoCoverFile = null;
+  let autoCoverUrl = null;
 
   const fields = ['name','slug','category','status','legalBasis','description','reqMin','reqRec','size','version','languages','install','notes','changelog','tags','dlc'];
 
@@ -197,6 +233,122 @@
     document.getElementById('form-error').classList.remove('show');
   }
 
+
+  function setSmartStatus(message, kind=''){
+    const el = document.getElementById('smart-status');
+    el.textContent = message;
+    el.className = `smart-status ${kind}`.trim();
+  }
+
+  function setValue(id, value){
+    if(value === undefined || value === null || value === '') return;
+    const el = document.getElementById(id);
+    if(el) el.value = value;
+  }
+
+  function renderSearchResults(results){
+    const box = document.getElementById('search-results');
+    box.replaceChildren();
+    results.forEach(game => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'search-result';
+      const img = document.createElement('img');
+      img.alt = '';
+      if(game.coverUrl) img.src = game.coverUrl;
+      const text = document.createElement('span');
+      const title = document.createElement('strong');
+      title.textContent = game.name;
+      const meta = document.createElement('small');
+      const details = [game.released, ...(game.genres || []).slice(0,2), (game.platforms || []).includes('PC') ? 'PC' : ''].filter(Boolean);
+      meta.textContent = details.join(' · ');
+      text.append(title,meta);
+      const pick = document.createElement('span');
+      pick.className = 'pick';
+      pick.textContent = 'USAR →';
+      button.append(img,text,pick);
+      button.addEventListener('click', () => loadSmartProduct(game.id));
+      box.append(button);
+    });
+  }
+
+  async function searchSmartProduct(){
+    const query = document.getElementById('smart-query').value.trim();
+    if(query.length < 2){ setSmartStatus('Escribí al menos dos caracteres.','error'); return; }
+    const btn = document.getElementById('smart-search-btn');
+    btn.disabled = true;
+    btn.textContent = 'Buscando…';
+    setSmartStatus('Consultando catálogo…');
+    document.getElementById('search-results').replaceChildren();
+    try{
+      const response = await fetch(`/api/game-data?q=${encodeURIComponent(query)}`);
+      const data = await response.json();
+      if(!response.ok) throw new Error(data.error || 'No se pudo buscar.');
+      if(!data.results?.length){ setSmartStatus('No encontré coincidencias. Podés completar el formulario manualmente.','error'); return; }
+      renderSearchResults(data.results);
+      setSmartStatus('Elegí el resultado correcto.','ok');
+    }catch(error){
+      setSmartStatus(error.message || 'Falló la búsqueda.','error');
+    }finally{
+      btn.disabled = false;
+      btn.textContent = 'Buscar y completar';
+    }
+  }
+
+  async function downloadAutomaticCover(url, name){
+    if(!url) return;
+    autoCoverUrl = url;
+    const preview = document.getElementById('cover-preview');
+    preview.src = url;
+    preview.classList.add('show');
+    markFile('cover','portada automática');
+    try{
+      const response = await fetch(`/api/image-proxy?url=${encodeURIComponent(url)}`);
+      if(!response.ok) throw new Error('No se pudo preparar la portada.');
+      const blob = await response.blob();
+      const ext = blob.type.includes('png') ? 'png' : blob.type.includes('webp') ? 'webp' : 'jpg';
+      autoCoverFile = new File([blob], `${a51_slugify(name || 'portada')}.${ext}`, {type:blob.type || 'image/jpeg'});
+    }catch(error){
+      autoCoverFile = null;
+      setSmartStatus('La ficha se completó, pero la portada automática no pudo prepararse. Podés subirla manualmente.','error');
+    }
+  }
+
+  async function loadSmartProduct(id){
+    setSmartStatus('Completando la ficha técnica…');
+    document.getElementById('search-results').replaceChildren();
+    try{
+      const response = await fetch(`/api/game-data?id=${encodeURIComponent(id)}`);
+      const data = await response.json();
+      if(!response.ok) throw new Error(data.error || 'No se pudo cargar la ficha.');
+      const product = data.product || {};
+      setValue('name',product.name);
+      if(!slugTouched){
+        setValue('slug',a51_slugify(product.name || ''));
+        document.getElementById('slug-preview').textContent = document.getElementById('slug').value || '…';
+      }
+      setValue('category',product.category || 'Juego de PC');
+      setValue('status',product.status || 'ok');
+      setValue('legalBasis',product.legalBasis || 'propio');
+      setValue('description',product.description);
+      setValue('reqMin',product.reqMin);
+      setValue('reqRec',product.reqRec);
+      setValue('size',product.size);
+      setValue('version',product.version);
+      setValue('languages',product.languages || 'Español, Inglés');
+      setValue('tags',product.tags);
+      await downloadAutomaticCover(product.coverUrl, product.name);
+      setSmartStatus(`Ficha completada desde ${product.source || 'catálogo externo'}. Revisala y subí el archivo principal.`, 'ok');
+    }catch(error){
+      setSmartStatus(error.message || 'No se pudo completar la ficha.','error');
+    }
+  }
+
+  document.getElementById('smart-search-btn').addEventListener('click', searchSmartProduct);
+  document.getElementById('smart-query').addEventListener('keydown', event => {
+    if(event.key === 'Enter'){ event.preventDefault(); searchSmartProduct(); }
+  });
+
   async function populateCategoryOptions(){
     const list = document.getElementById('category-options');
     const categories = await a51_getCategories();
@@ -217,7 +369,16 @@
   ['cover','mainFile','notesFile','otherFile'].forEach(id => {
     document.getElementById(id).addEventListener('change', (e) => {
       const f = e.target.files[0];
-      if(f) markFile(id, f.name);
+      if(f){
+        markFile(id, f.name);
+        if(id === 'cover'){
+          autoCoverFile = null;
+          autoCoverUrl = null;
+          const preview = document.getElementById('cover-preview');
+          preview.src = URL.createObjectURL(f);
+          preview.classList.add('show');
+        }
+      }
     });
   });
 
@@ -232,7 +393,7 @@
     const input = { slug: document.getElementById('slug').value.trim() };
     fields.forEach(f => { if(f !== 'slug') input[f] = document.getElementById(f).value; });
 
-    input.coverFile = document.getElementById('cover').files[0] || null;
+    input.coverFile = document.getElementById('cover').files[0] || autoCoverFile || null;
     input.mainFile = document.getElementById('mainFile').files[0] || null;
     input.notesFile = document.getElementById('notesFile').files[0] || null;
     input.otherFile = document.getElementById('otherFile').files[0] || null;
@@ -265,6 +426,7 @@
     await populateCategoryOptions();
 
     if(editSlug){
+      document.getElementById('smart-section').style.display = 'none';
       currentProduct = await a51_getProductBySlug(editSlug);
       if(currentProduct){
         document.getElementById('mode-label').textContent = 'Editando registro';
