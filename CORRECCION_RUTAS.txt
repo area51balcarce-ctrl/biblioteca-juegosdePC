@@ -1,0 +1,11 @@
+CORRECCIÓN APLICADA
+
+- Login redirige a /admin/dashboard
+- Rutas explícitas para Vercel
+- Editor y dashboard usan enlaces absolutos
+
+SUBIDA:
+1. Borrar los archivos actuales de GitHub.
+2. Subir todo el contenido de este ZIP a la raíz.
+3. Esperar el deploy automático de Vercel.
+4. Abrir /admin e iniciar sesión.

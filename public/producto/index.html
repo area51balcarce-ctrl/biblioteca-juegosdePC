@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title id="page-title">Ficha de producto — ÁREA 51</title>
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  .hero{
+    position:relative; border-bottom:1px solid var(--line);
+    background:
+      linear-gradient(180deg, rgba(7,9,10,0) 0%, rgba(7,9,10,.55) 55%, var(--bg) 100%),
+      linear-gradient(120deg, rgba(57,255,157,.10), rgba(57,255,157,0) 45%);
+  }
+  .hero-inner{ display:grid; grid-template-columns:280px 1fr; gap:44px; padding:56px clamp(20px,5vw,64px) 40px; align-items:end; }
+  .cover-wrap{ position:relative; }
+  .cover{ width:100%; aspect-ratio:3/4; object-fit:cover; display:block; filter:saturate(1.05) contrast(1.05); border:1px solid var(--line-bright); background:var(--bg-elev); }
+  .cover-scan{ position:absolute; inset:0; background:linear-gradient(180deg, transparent 60%, rgba(57,255,157,.18) 100%); pointer-events:none; }
+  .meta-row{ display:flex; flex-wrap:wrap; gap:10px; margin:14px 0 18px; }
+  .title-block h1{ font-size:clamp(32px,4.4vw,54px); line-height:1.02; margin-bottom:10px; }
+  .subtitle{ color:var(--text-dim); font-size:16px; max-width:60ch; }
+  .cta-row{ display:flex; flex-wrap:wrap; gap:12px; margin-top:26px; }
+
+  .content-grid{ display:grid; grid-template-columns:2fr 1fr; gap:40px; padding:44px clamp(20px,5vw,64px) 80px; }
+  @media (max-width:880px){ .content-grid{ grid-template-columns:1fr; } .hero-inner{ grid-template-columns:1fr; } .cover-wrap{ max-width:200px; } }
+
+  .block{ margin-bottom:40px; }
+  .block h2{ font-size:13px; letter-spacing:.16em; text-transform:uppercase; color:var(--accent); font-family:var(--f-mono); margin-bottom:16px; display:flex; align-items:center; gap:10px; }
+  .block h2::after{ content:""; flex:1; height:1px; background:var(--line); }
+  .prose{ color:var(--text-dim); font-size:15px; white-space:pre-line; }
+
+  .req-table{ width:100%; border-collapse:collapse; font-size:13.5px; }
+  .req-table td{ padding:8px 0; border-bottom:1px solid var(--line); color:var(--text); vertical-align:top; }
+
+  .req-toggle{ display:flex; gap:6px; margin-bottom:14px; }
+  .req-toggle button{ font-family:var(--f-mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; padding:7px 14px; background:transparent; border:1px solid var(--line); color:var(--text-dim); cursor:pointer; }
+  .req-toggle button.active{ border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+  .req-set{ display:none; white-space:pre-line; font-size:13.5px; color:var(--text-dim); }
+  .req-set.active{ display:block; }
+
+  .changelog-entry{ border-left:2px solid var(--line-bright); padding:2px 0 16px 16px; margin-bottom:4px; position:relative; }
+  .changelog-entry::before{ content:""; position:absolute; left:-5px; top:4px; width:8px; height:8px; background:var(--accent); box-shadow:0 0 6px var(--accent); }
+  .changelog-date{ font-family:var(--f-mono); font-size:11px; color:var(--text-faint); letter-spacing:.06em; }
+  .changelog-text{ font-size:14px; margin-top:4px; }
+
+  .note-box{ border:1px solid #6b4d15; background:rgba(255,176,32,.06); padding:16px 18px; font-size:13.5px; color:#e9d8b0; display:flex; gap:12px; }
+  .note-box .ic{ color:var(--warn); font-family:var(--f-mono); font-weight:600; }
+
+  .side-panel{ padding:22px; margin-bottom:20px; }
+  .side-panel h3{ font-family:var(--f-mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--text-faint); margin-bottom:14px; }
+  .kv{ display:flex; justify-content:space-between; font-size:13.5px; padding:8px 0; border-bottom:1px dashed var(--line); }
+  .kv:last-child{ border-bottom:none; }
+  .kv span:first-child{ color:var(--text-faint); }
+  .kv span:last-child{ font-family:var(--f-mono); text-align:right; }
+
+  .download-list{ display:flex; flex-direction:column; gap:10px; }
+  .dl-item{ display:flex; align-items:center; justify-content:space-between; padding:13px 14px; border:1px solid var(--line-bright); }
+  .dl-item .lbl{ display:flex; flex-direction:column; gap:2px; }
+  .dl-item .lbl b{ font-size:13.5px; font-weight:600; }
+  .dl-item .lbl small{ font-family:var(--f-mono); font-size:10.5px; color:var(--text-faint); }
+  .dl-item .btn{ padding:8px 14px; font-size:11px; }
+  .dl-empty{ font-family:var(--f-mono); font-size:12px; color:var(--text-faint); padding:8px 0; }
+
+  .tag{ font-family:var(--f-mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; padding:4px 9px; border:1px solid var(--line-bright); color:var(--text-dim); }
+  .tag-row{ display:flex; flex-wrap:wrap; gap:8px; }
+
+  footer{ border-top:1px solid var(--line); padding:26px clamp(20px,5vw,64px); font-family:var(--f-mono); font-size:11px; color:var(--text-faint); letter-spacing:.05em; display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+
+  .empty-state{ min-height:70vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:14px; padding:40px 20px; }
+  .empty-state .eyebrow{ justify-content:center; }
+  .empty-state h1{ font-size:26px; }
+  .empty-state p{ color:var(--text-dim); max-width:46ch; }
+</style>
+</head>
+<body>
+<div class="a51-scanbg"></div>
+
+<header class="a51-header">
+  <div class="a51-brand"><span class="dot"></span> ÁREA&nbsp;51</div>
+  <div class="a51-tag">ARCHIVO&nbsp;·&nbsp;ENTREGA&nbsp;DIRECTA</div>
+</header>
+
+<div id="app">
+  <div class="empty-state">
+    <div class="eyebrow">Cargando</div>
+    <h1>Buscando el producto…</h1>
+  </div>
+</div>
+
+<footer>
+  <span id="footer-legal">ÁREA 51 // Ficha de producto</span>
+  <span>Enlace de uso privado — no redistribuir públicamente</span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/store.js"></script>
+<script>
+  const LEGAL_LABELS = {
+    freeware: "Freeware", shareware: "Shareware",
+    "dominio-publico": "Dominio público / libre", reventa: "Licencia de reventa", propio: "Contenido propio",
+  };
+
+  function esc(s){ return (s || '').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function renderEmpty(reason){
+    document.getElementById('app').innerHTML = `
+      <div class="empty-state">
+        <div class="eyebrow">Sin datos</div>
+        <h1>${reason}</h1>
+        <p>Esta página se arma a partir del catálogo. Si el producto existe pero no aparece, puede que todavía esté en borrador — solo los productos publicados son visibles en un enlace público.</p>
+        <a class="btn btn-primary" href="/admin/dashboard">← Volver al panel</a>
+      </div>
+    `;
+  }
+
+  function dlItem(label, file, url, ext){
+    if(!file) return `<div class="dl-empty">${label}: sin archivo cargado</div>`;
+    if(!url) return `<div class="dl-empty">${label}: no se pudo generar el enlace de descarga, recargá la página</div>`;
+    return `
+      <div class="dl-item">
+        <div class="lbl"><b>${label}</b><small>${esc(file.name)}</small></div>
+        <a class="btn" href="${url}" download="${esc(file.name)}">↓ ${ext}</a>
+      </div>`;
+  }
+
+  async function renderGame(g){
+    document.getElementById('page-title').textContent = `${g.name || 'Producto'} — ÁREA 51`;
+    document.title = `${g.name || 'Producto'} — ÁREA 51`;
+
+    const tags = (g.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+    const changelogLines = (g.changelog || '').split('\n').map(l => l.trim()).filter(Boolean);
+    const coverSrc = g.cover ? g.cover.url
+      : "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='533'><rect width='100%25' height='100%25' fill='%23131a18'/><text x='50%25' y='50%25' fill='%2339ff9d' font-family='monospace' font-size='16' text-anchor='middle'>SIN PORTADA</text></svg>";
+
+    // Las URLs de descarga son temporales (ver a51_getSignedDownloadUrl):
+    // se generan de nuevo cada vez que se abre esta página.
+    const [mainUrl, notesUrl, otherUrl] = await Promise.all([
+      g.files.main ? a51_getSignedDownloadUrl(g.files.main.path) : null,
+      g.files.notes ? a51_getSignedDownloadUrl(g.files.notes.path) : null,
+      g.files.other ? a51_getSignedDownloadUrl(g.files.other.path) : null,
+    ]);
+
+    document.getElementById('footer-legal').textContent =
+      `ÁREA 51 // Distribución: ${LEGAL_LABELS[g.legalBasis] || 'sin definir'}`;
+
+    document.getElementById('app').innerHTML = `
+      <section class="hero">
+        <div class="hero-inner">
+          <div class="cover-wrap bracket-frame">
+            <img class="cover" alt="Portada de ${esc(g.name)}" src="${coverSrc}">
+            <div class="cover-scan"></div>
+          </div>
+          <div class="title-block">
+            <div class="eyebrow">${g.status === 'ok' ? 'Registro disponible' : 'Borrador — vista previa'}</div>
+            <h1>${esc(g.name) || '(sin nombre)'}</h1>
+            <p class="subtitle">${esc(g.description) || 'Sin descripción cargada todavía.'}</p>
+            <div class="meta-row">
+              <span class="badge badge-ok">${LEGAL_LABELS[g.legalBasis] || 'Sin base legal definida'}</span>
+              ${g.version ? `<span class="badge badge-off">v${esc(g.version)}</span>` : ''}
+              ${g.size ? `<span class="badge badge-off">${esc(g.size)}</span>` : ''}
+            </div>
+            <div class="cta-row">
+              <a class="btn btn-primary" href="#descargas">↓ Ir a descargas</a>
+              <a class="btn" href="#requisitos">Ver requisitos</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <main class="content-grid">
+        <div>
+          <div class="block">
+            <h2>Descripción</h2>
+            <div class="prose">${esc(g.description) || 'Sin descripción cargada.'}</div>
+          </div>
+
+          <div class="block" id="requisitos">
+            <h2>Requisitos del sistema</h2>
+            <div class="req-toggle">
+              <button class="active" data-req="min">Mínimos</button>
+              <button data-req="rec">Recomendados</button>
+            </div>
+            <div class="req-set active" data-set="min">${esc(g.reqMin) || 'No especificados.'}</div>
+            <div class="req-set" data-set="rec">${esc(g.reqRec) || 'No especificados.'}</div>
+          </div>
+
+          <div class="block">
+            <h2>Instrucciones de instalación</h2>
+            <div class="prose">${esc(g.install) || 'Sin instrucciones cargadas.'}</div>
+          </div>
+
+          ${g.notes ? `
+          <div class="block">
+            <h2>Notas importantes</h2>
+            <div class="note-box"><span class="ic">⚠</span><span>${esc(g.notes)}</span></div>
+          </div>` : ''}
+
+          <div class="block">
+            <h2>Historial de versiones</h2>
+            ${changelogLines.length ? changelogLines.map(line => {
+              const [first, ...rest] = line.split('—');
+              return `<div class="changelog-entry">
+                <div class="changelog-date">${esc(first.trim())}</div>
+                <div class="changelog-text">${esc(rest.join('—').trim())}</div>
+              </div>`;
+            }).join('') : '<div class="prose">Sin historial cargado.</div>'}
+          </div>
+        </div>
+
+        <aside>
+          <div class="panel side-panel">
+            <h3>Ficha técnica</h3>
+            <div class="kv"><span>Versión</span><span>${esc(g.version) || '—'}</span></div>
+            <div class="kv"><span>Categoría</span><span>${esc(g.category) || '—'}</span></div>
+            <div class="kv"><span>Idiomas</span><span>${esc(g.languages) || '—'}</span></div>
+            <div class="kv"><span>Actualizado</span><span>${esc(g.updated) || '—'}</span></div>
+            <div class="kv"><span>Contenido adicional</span><span>${esc(g.dlc) || 'No aplica'}</span></div>
+          </div>
+
+          <div class="panel side-panel" id="descargas">
+            <h3>Descargas</h3>
+            <div class="download-list">
+              ${dlItem('Archivo principal', g.files.main, mainUrl, 'Descargar')}
+              ${dlItem('Notas / enlaces', g.files.notes, notesUrl, 'Descargar')}
+              ${dlItem('Otro archivo', g.files.other, otherUrl, 'Descargar')}
+            </div>
+          </div>
+
+          <div class="panel side-panel">
+            <h3>Categorías</h3>
+            <div class="tag-row">
+              ${g.category ? `<span class="tag">${esc(g.category)}</span>` : ''}
+              ${tags.map(t => `<span class="tag">${esc(t)}</span>`).join('') || '<span class="tag">Sin etiquetas</span>'}
+            </div>
+          </div>
+        </aside>
+      </main>
+    `;
+
+    document.querySelectorAll('.req-toggle button').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        document.querySelectorAll('.req-toggle button').forEach(b=>b.classList.remove('active'));
+        document.querySelectorAll('.req-set').forEach(s=>s.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelector('.req-set[data-set="'+btn.dataset.req+'"]').classList.add('active');
+      });
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // Punto de entrada: lee el slug de la URL (?slug=xxx) y busca el
+  // producto en Supabase. Si el producto está en borrador, la política
+  // RLS de "products" ya se encarga de que un visitante anónimo no lo vea
+  // (a51_getProductBySlug devuelve null como si no existiera).
+  // ------------------------------------------------------------------
+  (async () => {
+    const slug = new URLSearchParams(location.search).get('slug');
+    if(!slug){
+      renderEmpty('No se especificó ningún producto');
+      return;
+    }
+    const product = await a51_getProductBySlug(slug);
+    if(!product){
+      renderEmpty(`No se encontró "${slug}" en el catálogo`);
+      return;
+    }
+    renderGame(product);
+  })();
+</script>
+</body>
+</html>
