@@ -1,3 +1,4 @@
+// IGDB VERSION 2
 const IGDB_BASE = 'https://api.igdb.com/v4';
 let tokenCache = { token: '', expiresAt: 0 };
 
