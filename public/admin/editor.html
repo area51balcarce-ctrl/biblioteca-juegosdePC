@@ -281,7 +281,7 @@
     setSmartStatus('Consultando catálogo…');
     document.getElementById('search-results').replaceChildren();
     try{
-      const response = await fetch(`/api/game-data?q=${encodeURIComponent(query)}`);
+      const response = await fetch(`/api/igdb-data-v2?q=${encodeURIComponent(query)}`);
       const data = await response.json();
       if(!response.ok) throw new Error(data.error || 'No se pudo buscar.');
       if(!data.results?.length){ setSmartStatus('No encontré coincidencias. Podés completar el formulario manualmente.','error'); return; }
@@ -318,7 +318,7 @@
     setSmartStatus('Completando la ficha técnica…');
     document.getElementById('search-results').replaceChildren();
     try{
-      const response = await fetch(`/api/game-data?id=${encodeURIComponent(id)}`);
+      const response = await fetch(`/api/igdb-data-v2?id=${encodeURIComponent(id)}`);
       const data = await response.json();
       if(!response.ok) throw new Error(data.error || 'No se pudo cargar la ficha.');
       const product = data.product || {};
