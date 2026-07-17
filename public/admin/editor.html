@@ -76,6 +76,11 @@
   background:var(--bg-elev);
 }
   .cover-preview.show{ display:block; }
+  .trailer-row{ display:grid; grid-template-columns:1fr auto auto; gap:10px; align-items:end; }
+  .trailer-status{ font-family:var(--f-mono); font-size:11px; margin-top:7px; color:var(--text-faint); }
+  .trailer-status.found{ color:var(--accent); }
+  .trailer-status.missing{ color:#ffc76b; }
+  @media (max-width:680px){ .trailer-row{ grid-template-columns:1fr; } }
   @media (max-width:680px){ .smart-row{ grid-template-columns:1fr; } .search-result{ grid-template-columns:54px 1fr; } .search-result .pick{ display:none; } }
 </style>
 </head>
@@ -168,6 +173,15 @@
           <div class="field"><label for="version">Versión</label><input type="text" id="version" placeholder="Ej: 1.0.0"></div>
           <div class="field"><label for="languages">Idiomas</label><input type="text" id="languages" placeholder="ES, EN…"></div>
         </div>
+        <div class="field">
+          <label for="trailerUrl">Trailer oficial — canal GameTrailers</label>
+          <div class="trailer-row">
+            <input type="text" id="trailerUrl" placeholder="Se busca automáticamente; también podés pegar un enlace manual">
+            <button type="button" class="btn" id="trailer-search-btn">Buscar trailer</button>
+            <button type="button" class="btn" id="trailer-view-btn" disabled>Ver trailer</button>
+          </div>
+          <div class="trailer-status" id="trailer-status">Todavía no se buscó un trailer.</div>
+        </div>
         <div class="field"><label for="install">Instrucciones de instalación</label><textarea id="install"></textarea></div>
         <div class="field"><label for="notes">Notas importantes</label><textarea id="notes"></textarea></div>
         <div class="field"><label for="changelog">Changelog (una línea por entrada)</label><textarea id="changelog" placeholder="2026-06-02 — Descripción del cambio"></textarea></div>
@@ -218,7 +232,7 @@
   let autoCoverFile = null;
   let autoCoverUrl = null;
 
-  const fields = ['name','slug','category','status','legalBasis','description','reqMin','reqRec','size','version','languages','install','notes','changelog','tags','dlc'];
+  const fields = ['name','slug','category','status','legalBasis','description','reqMin','reqRec','size','version','languages','trailerUrl','install','notes','changelog','tags','dlc'];
 
   function fillForm(product){
     fields.forEach(f => { if(document.getElementById(f) && product[f] !== undefined) document.getElementById(f).value = product[f]; });
@@ -255,6 +269,54 @@
     if(value === undefined || value === null || value === '') return;
     const el = document.getElementById(id);
     if(el) el.value = value;
+  }
+
+  function isYoutubeUrl(value){
+    try{
+      const url = new URL(value);
+      return ['youtube.com','www.youtube.com','youtu.be','m.youtube.com'].includes(url.hostname);
+    }catch{ return false; }
+  }
+
+  function updateTrailerUi(message, kind=''){
+    const input = document.getElementById('trailerUrl');
+    const status = document.getElementById('trailer-status');
+    const viewBtn = document.getElementById('trailer-view-btn');
+    status.textContent = message;
+    status.className = `trailer-status ${kind}`.trim();
+    viewBtn.disabled = !isYoutubeUrl(input.value.trim());
+  }
+
+  async function searchGameTrailer(gameName){
+    const name = String(gameName || document.getElementById('name').value || document.getElementById('smart-query').value).trim();
+    if(name.length < 2){
+      updateTrailerUi('Escribí o cargá primero el nombre del juego.','missing');
+      return '';
+    }
+    const btn = document.getElementById('trailer-search-btn');
+    btn.disabled = true;
+    btn.textContent = 'Buscando…';
+    updateTrailerUi('Buscando únicamente en el canal GameTrailers…');
+    try{
+      const response = await fetch(`/api/gametrailers-search?q=${encodeURIComponent(name)}`);
+      const data = await response.json();
+      if(!response.ok) throw new Error(data.error || 'No se pudo buscar el trailer.');
+      if(data.trailerUrl){
+        document.getElementById('trailerUrl').value = data.trailerUrl;
+        updateTrailerUi('🟢 Trailer encontrado automáticamente en GameTrailers.','found');
+        return data.trailerUrl;
+      }
+      document.getElementById('trailerUrl').value = '';
+      updateTrailerUi('🟡 No se encontró en GameTrailers. El campo queda vacío para cargarlo manualmente.','missing');
+      return '';
+    }catch(error){
+      document.getElementById('trailerUrl').value = '';
+      updateTrailerUi('🟡 No se pudo confirmar un trailer. El campo queda vacío para cargarlo manualmente.','missing');
+      return '';
+    }finally{
+      btn.disabled = false;
+      btn.textContent = 'Buscar trailer';
+    }
   }
 
   function renderSearchResults(results){
@@ -348,12 +410,25 @@
       setValue('version',product.version);
       setValue('languages',product.languages || 'Español, Inglés');
       setValue('tags',product.tags);
+      await searchGameTrailer(product.name);
       await downloadAutomaticCover(product.coverUrl, product.name);
       setSmartStatus(`Ficha completada desde ${product.source || 'catálogo externo'}. Revisala y subí el archivo principal.`, 'ok');
     }catch(error){
       setSmartStatus(error.message || 'No se pudo completar la ficha.','error');
     }
   }
+
+  document.getElementById('trailer-search-btn').addEventListener('click', () => searchGameTrailer());
+  document.getElementById('trailer-view-btn').addEventListener('click', () => {
+    const url = document.getElementById('trailerUrl').value.trim();
+    if(isYoutubeUrl(url)) window.open(url, '_blank', 'noopener,noreferrer');
+  });
+  document.getElementById('trailerUrl').addEventListener('input', event => {
+    const value = event.target.value.trim();
+    if(!value) updateTrailerUi('🟡 Sin trailer. Podés buscarlo o pegarlo manualmente.','missing');
+    else if(isYoutubeUrl(value)) updateTrailerUi('🟢 Trailer cargado y listo para revisar.','found');
+    else updateTrailerUi('El enlace ingresado no parece ser de YouTube.','missing');
+  });
 
   document.getElementById('smart-search-btn').addEventListener('click', searchSmartProduct);
   document.getElementById('smart-query').addEventListener('keydown', event => {
