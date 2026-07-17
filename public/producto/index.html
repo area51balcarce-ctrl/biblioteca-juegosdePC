@@ -55,12 +55,24 @@
   .kv span:last-child{ font-family:var(--f-mono); text-align:right; }
 
   .download-list{ display:flex; flex-direction:column; gap:10px; }
-  .dl-item{ display:flex; align-items:center; justify-content:space-between; padding:13px 14px; border:1px solid var(--line-bright); }
-  .dl-item .lbl{ display:flex; flex-direction:column; gap:2px; }
+  .dl-item{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding:13px 14px; border:1px solid var(--line-bright); }
+  .dl-item .lbl{ display:flex; flex-direction:column; gap:2px; min-width:0; }
   .dl-item .lbl b{ font-size:13.5px; font-weight:600; }
-  .dl-item .lbl small{ font-family:var(--f-mono); font-size:10.5px; color:var(--text-faint); }
-  .dl-item .btn{ padding:8px 14px; font-size:11px; }
+  .dl-item .lbl small{ font-family:var(--f-mono); font-size:10.5px; color:var(--text-faint); overflow-wrap:anywhere; }
+  .dl-item .btn{ padding:8px 14px; font-size:11px; flex:none; }
   .dl-empty{ font-family:var(--f-mono); font-size:12px; color:var(--text-faint); padding:8px 0; }
+
+  .modal{ position:fixed; inset:0; z-index:1000; display:none; align-items:center; justify-content:center; padding:20px; }
+  .modal.open{ display:flex; }
+  .modal-backdrop{ position:absolute; inset:0; background:rgba(0,0,0,.78); backdrop-filter:blur(4px); }
+  .modal-card{ position:relative; z-index:1; width:min(680px,100%); max-height:88vh; overflow:auto; border:1px solid var(--line-bright); background:var(--bg-elev); box-shadow:0 24px 80px rgba(0,0,0,.55); }
+  .modal-head{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding:18px 20px; border-bottom:1px solid var(--line); }
+  .modal-head h2{ margin:0; font-family:var(--f-mono); font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); }
+  .modal-close{ width:38px; height:38px; border:1px solid var(--line-bright); background:transparent; color:var(--text); font-size:22px; cursor:pointer; }
+  .modal-body{ padding:20px; }
+  .video-wrap{ position:relative; width:100%; aspect-ratio:16/9; background:#000; }
+  .video-wrap iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; }
+  body.modal-open{ overflow:hidden; }
 
   .tag{ font-family:var(--f-mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; padding:4px 9px; border:1px solid var(--line-bright); color:var(--text-dim); }
   .tag-row{ display:flex; flex-wrap:wrap; gap:8px; }
@@ -105,45 +117,10 @@
   function esc(s){ return (s || '').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
   function renderEmpty(reason){
-    document.getElementById('app').innerHTML = `
-      <div class="empty-state">
-        <div class="eyebrow">Sin datos</div>
-        <h1>${reason}</h1>
-        <p>Esta página se arma a partir del catálogo. Si el producto existe pero no aparece, puede que todavía esté en borrador — solo los productos publicados son visibles en un enlace público.</p>
-        <a class="btn btn-primary" href="/admin/dashboard">← Volver al panel</a>
-      </div>
-    `;
-  }
-
-  function dlItem(label, file, url, ext){
-    if(!file) return `<div class="dl-empty">${label}: sin archivo cargado</div>`;
-    if(!url) return `<div class="dl-empty">${label}: no se pudo generar el enlace de descarga, recargá la página</div>`;
-    return `
-      <div class="dl-item">
-        <div class="lbl"><b>${label}</b><small>${esc(file.name)}</small></div>
-        <a class="btn" href="${url}" download="${esc(file.name)}">↓ ${ext}</a>
-      </div>`;
-  }
-
-  async function renderGame(g){
-    document.getElementById('page-title').textContent = `${g.name || 'Producto'} — ÁREA 51`;
-    document.title = `${g.name || 'Producto'} — ÁREA 51`;
-
-    const tags = (g.tags || '').split(',').map(t => t.trim()).filter(Boolean);
-    const changelogLines = (g.changelog || '').split('\n').map(l => l.trim()).filter(Boolean);
-    const coverSrc = g.cover ? g.cover.url
-      : "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='533'><rect width='100%25' height='100%25' fill='%23131a18'/><text x='50%25' y='50%25' fill='%2339ff9d' font-family='monospace' font-size='16' text-anchor='middle'>SIN PORTADA</text></svg>";
-
-    // Las URLs de descarga son temporales (ver a51_getSignedDownloadUrl):
-    // se generan de nuevo cada vez que se abre esta página.
-    const [mainUrl, notesUrl, otherUrl] = await Promise.all([
-      g.files.main ? a51_getSignedDownloadUrl(g.files.main.path) : null,
-      g.files.notes ? a51_getSignedDownloadUrl(g.files.notes.path) : null,
-      g.files.other ? a51_getSignedDownloadUrl(g.files.other.path) : null,
-    ]);
-
-    document.getElementById('footer-legal').textContent =
-      `ÁREA 51 // Distribución: ${LEGAL_LABELS[g.legalBasis] || 'sin definir'}`;
+    const activeDownloads = (g.downloads || []).filter(item =>
+      item.url && item.status !== 'disabled'
+    );
+    const trailerEmbedUrl = getYouTubeEmbedUrl(g.trailerUrl);
 
     document.getElementById('app').innerHTML = `
       <section class="hero">
@@ -162,8 +139,8 @@
               ${g.size ? `<span class="badge badge-off">${esc(g.size)}</span>` : ''}
             </div>
             <div class="cta-row">
-              <a class="btn btn-primary" href="#descargas">↓ Ir a descargas</a>
-              <a class="btn" href="#requisitos">Ver requisitos</a>
+              ${activeDownloads.length ? `<button class="btn btn-primary" id="open-downloads" type="button">↓ Ir a descargas</button>` : ''}
+              ${trailerEmbedUrl ? `<button class="btn" id="open-trailer" type="button">▶ Ver tráiler</button>` : ''}
             </div>
           </div>
         </div>
@@ -171,11 +148,6 @@
 
       <main class="content-grid">
         <div>
-          <div class="block">
-            <h2>Descripción</h2>
-            <div class="prose">${esc(g.description) || 'Sin descripción cargada.'}</div>
-          </div>
-
           <div class="block" id="requisitos">
             <h2>Requisitos del sistema</h2>
             <div class="req-toggle">
@@ -186,10 +158,11 @@
             <div class="req-set" data-set="rec">${esc(g.reqRec) || 'No especificados.'}</div>
           </div>
 
+          ${g.install ? `
           <div class="block">
             <h2>Instrucciones de instalación</h2>
-            <div class="prose">${esc(g.install) || 'Sin instrucciones cargadas.'}</div>
-          </div>
+            <div class="prose">${esc(g.install)}</div>
+          </div>` : ''}
 
           ${g.notes ? `
           <div class="block">
@@ -197,46 +170,79 @@
             <div class="note-box"><span class="ic">⚠</span><span>${esc(g.notes)}</span></div>
           </div>` : ''}
 
+          ${changelogLines.length ? `
           <div class="block">
             <h2>Historial de versiones</h2>
-            ${changelogLines.length ? changelogLines.map(line => {
+            ${changelogLines.map(line => {
               const [first, ...rest] = line.split('—');
               return `<div class="changelog-entry">
                 <div class="changelog-date">${esc(first.trim())}</div>
                 <div class="changelog-text">${esc(rest.join('—').trim())}</div>
               </div>`;
-            }).join('') : '<div class="prose">Sin historial cargado.</div>'}
-          </div>
+            }).join('')}
+          </div>` : ''}
         </div>
 
         <aside>
           <div class="panel side-panel">
             <h3>Ficha técnica</h3>
-            <div class="kv"><span>Versión</span><span>${esc(g.version) || '—'}</span></div>
-            <div class="kv"><span>Categoría</span><span>${esc(g.category) || '—'}</span></div>
-            <div class="kv"><span>Idiomas</span><span>${esc(g.languages) || '—'}</span></div>
-            <div class="kv"><span>Actualizado</span><span>${esc(g.updated) || '—'}</span></div>
-            <div class="kv"><span>Contenido adicional</span><span>${esc(g.dlc) || 'No aplica'}</span></div>
+            ${g.version ? `<div class="kv"><span>Versión</span><span>${esc(g.version)}</span></div>` : ''}
+            ${g.category ? `<div class="kv"><span>Categoría</span><span>${esc(g.category)}</span></div>` : ''}
+            ${g.languages ? `<div class="kv"><span>Idiomas</span><span>${esc(g.languages)}</span></div>` : ''}
+            ${g.updated ? `<div class="kv"><span>Actualizado</span><span>${esc(g.updated)}</span></div>` : ''}
+            ${g.dlc ? `<div class="kv"><span>Contenido adicional</span><span>${esc(g.dlc)}</span></div>` : ''}
           </div>
 
-          <div class="panel side-panel" id="descargas">
-            <h3>Descargas</h3>
-            <div class="download-list">
-              ${dlItem('Archivo principal', g.files.main, mainUrl, 'Descargar')}
-              ${dlItem('Notas / enlaces', g.files.notes, notesUrl, 'Descargar')}
-              ${dlItem('Otro archivo', g.files.other, otherUrl, 'Descargar')}
-            </div>
-          </div>
-
+          ${(g.category || tags.length) ? `
           <div class="panel side-panel">
             <h3>Categorías</h3>
             <div class="tag-row">
               ${g.category ? `<span class="tag">${esc(g.category)}</span>` : ''}
-              ${tags.map(t => `<span class="tag">${esc(t)}</span>`).join('') || '<span class="tag">Sin etiquetas</span>'}
+              ${tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}
             </div>
-          </div>
+          </div>` : ''}
         </aside>
       </main>
+
+      <div class="modal" id="downloads-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="downloads-title">
+        <div class="modal-backdrop" data-close-modal></div>
+        <div class="modal-card">
+          <div class="modal-head">
+            <h2 id="downloads-title">Descargas disponibles</h2>
+            <button class="modal-close" type="button" aria-label="Cerrar" data-close-modal>×</button>
+          </div>
+          <div class="modal-body">
+            <div class="download-list">
+              ${activeDownloads.length ? activeDownloads.map(item => `
+                <div class="dl-item">
+                  <div class="lbl">
+                    <b>${esc(downloadLabel(item.type))}</b>
+                    <small>${item.healthStatus === 'down' ? 'Enlace caído' : item.healthStatus === 'review' ? 'Revisión manual' : 'Enlace directo'}</small>
+                  </div>
+                  <a class="btn" href="${esc(item.url)}" target="_blank" rel="noopener noreferrer">Descargar</a>
+                </div>
+              `).join('') : '<div class="dl-empty">No hay enlaces disponibles.</div>'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      ${trailerEmbedUrl ? `
+      <div class="modal" id="trailer-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="trailer-title" data-trailer-src="${esc(trailerEmbedUrl)}">
+        <div class="modal-backdrop" data-close-modal></div>
+        <div class="modal-card">
+          <div class="modal-head">
+            <h2 id="trailer-title">Tráiler</h2>
+            <button class="modal-close" type="button" aria-label="Cerrar" data-close-modal>×</button>
+          </div>
+          <div class="modal-body">
+            <div class="video-wrap">
+              <iframe title="Tráiler de ${esc(g.name)}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+            </div>
+          </div>
+        </div>
+      </div>` : ''}
+    `;
     `;
 
     document.querySelectorAll('.req-toggle button').forEach(btn=>{
@@ -246,6 +252,29 @@
         btn.classList.add('active');
         document.querySelector('.req-set[data-set="'+btn.dataset.req+'"]').classList.add('active');
       });
+    });
+
+    document.getElementById('open-downloads')?.addEventListener('click', ()=>{
+      openModal('downloads-modal');
+    });
+
+    document.getElementById('open-trailer')?.addEventListener('click', ()=>{
+      const modal = document.getElementById('trailer-modal');
+      const iframe = modal?.querySelector('iframe');
+      if(modal && iframe){
+        iframe.src = modal.dataset.trailerSrc || '';
+        openModal('trailer-modal');
+      }
+    });
+
+    document.querySelectorAll('[data-close-modal]').forEach(el=>{
+      el.addEventListener('click', ()=> closeModal(el.closest('.modal')));
+    });
+
+    document.addEventListener('keydown', event=>{
+      if(event.key === 'Escape'){
+        document.querySelectorAll('.modal.open').forEach(closeModal);
+      }
     });
   }
 
