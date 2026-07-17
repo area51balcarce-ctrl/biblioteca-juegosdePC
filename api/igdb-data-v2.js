@@ -96,14 +96,64 @@ async function steamDetails(appId){
     if(!response.ok) return null;
     const json = await response.json();
     return json?.[appId]?.success ? json[appId].data : null;
-  }catch{ return null; }
+  }catch{
+    return null;
+  }
+}
+
+async function translateToSpanish(texts, apiKey){
+  const originals = texts.map(text => String(text || '').trim());
+  const nonEmpty = originals.map((text, index) => ({text, index})).filter(item => item.text);
+  if(!apiKey || !nonEmpty.length) return originals;
+
+  const endpoint = apiKey.endsWith(':fx')
+    ? 'https://api-free.deepl.com/v2/translate'
+    : 'https://api.deepl.com/v2/translate';
+
+  try{
+    const body = new URLSearchParams();
+    nonEmpty.forEach(item => body.append('text', item.text));
+    body.set('target_lang', 'ES');
+    body.set('preserve_formatting', '1');
+
+    const response = await fetch(endpoint, {
+      method:'POST',
+      headers:{
+        'Authorization':`DeepL-Auth-Key ${apiKey}`,
+        'Content-Type':'application/x-www-form-urlencoded'
+      },
+      body
+    });
+
+    if(!response.ok){
+      const detail = await response.text().catch(()=> '');
+      console.warn(`DeepL respondió ${response.status}: ${detail.slice(0,160)}`);
+      return originals;
+    }
+
+    const json = await response.json();
+    const output = [...originals];
+    (json.translations || []).forEach((translation, i) => {
+      const target = nonEmpty[i];
+      if(target && translation?.text) output[target.index] = translation.text.trim();
+    });
+    return output;
+  }catch(error){
+    console.warn('DeepL no disponible; se conserva el texto original.', error);
+    return originals;
+  }
 }
 
 module.exports = async function handler(req, res){
   if(req.method !== 'GET') return send(res,405,{error:'Método no permitido'});
+
   const clientId = process.env.IGDB_CLIENT_ID;
   const clientSecret = process.env.IGDB_CLIENT_SECRET;
-  if(!clientId || !clientSecret) return send(res,500,{error:'Faltan IGDB_CLIENT_ID y/o IGDB_CLIENT_SECRET en Vercel.'});
+  const deeplApiKey = process.env.DEEPL_API_KEY || '';
+
+  if(!clientId || !clientSecret){
+    return send(res,500,{error:'Faltan IGDB_CLIENT_ID y/o IGDB_CLIENT_SECRET en Vercel.'});
+  }
 
   try{
     const token = await getAccessToken(clientId, clientSecret);
@@ -132,8 +182,15 @@ module.exports = async function handler(req, res){
 
       const steamId = (game.websites || []).map(w => parseSteamAppId(w.url)).find(Boolean) || null;
       const steam = await steamDetails(steamId);
-      const steamMin = steam?.pc_requirements?.minimum || '';
-      const steamRec = steam?.pc_requirements?.recommended || '';
+      const steamMin = stripHtml(steam?.pc_requirements?.minimum || '');
+      const steamRec = stripHtml(steam?.pc_requirements?.recommended || '');
+      const originalDescription = stripHtml(steam?.short_description || game.summary || game.storyline || '');
+
+      const [description, reqMin, reqRec] = await translateToSpanish(
+        [originalDescription, steamMin, steamRec],
+        deeplApiKey
+      );
+
       const developers = (game.involved_companies || []).filter(x => x.developer).map(x => x.company?.name).filter(Boolean);
       const publishers = (game.involved_companies || []).filter(x => x.publisher).map(x => x.company?.name).filter(Boolean);
       const genres = (game.genres || []).map(g => g.name);
@@ -144,16 +201,18 @@ module.exports = async function handler(req, res){
           category: 'Juego de PC',
           status: 'ok',
           legalBasis: 'propio',
-          description: stripHtml(steam?.short_description || game.summary || game.storyline || ''),
-          reqMin: stripHtml(steamMin),
-          reqRec: stripHtml(steamRec),
+          description,
+          reqMin,
+          reqRec,
           size: extractStorage(steamMin, steamRec),
           version: '',
           languages: normalizeLanguages(steam?.supported_languages || ''),
           tags: [...genres, ...developers, ...publishers].filter(Boolean).slice(0,10).join(', '),
           coverUrl: steam?.header_image || coverUrl(game.cover?.image_id, 'cover_big'),
           released: game.first_release_date ? new Date(game.first_release_date * 1000).toISOString().slice(0,10) : '',
-          source: steam ? 'IGDB + Steam' : 'IGDB'
+          source: deeplApiKey
+            ? (steam ? 'IGDB + Steam + DeepL' : 'IGDB + DeepL')
+            : (steam ? 'IGDB + Steam' : 'IGDB')
         }
       });
     }
