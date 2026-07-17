@@ -131,7 +131,13 @@ async function a51_getOrCreateCategoryId(name){
 }
 
 async function a51_getOrCreateTagIds(namesCsv){
-  const names = (namesCsv || '').split(',').map(t => t.trim()).filter(Boolean);
+  const names = [...new Set(
+    (namesCsv || '')
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean)
+      .map(name => name.slice(0, 80))
+  )];
   const ids = [];
   for(const name of names){
     const { data: existing, error: selError } = await A51_CLIENT
@@ -247,7 +253,7 @@ function a51_safeFileName(name){
 async function a51_uploadFile(bucket, productId, file){
   const path = `${productId}/${Date.now()}-${a51_safeFileName(file.name)}`;
   const { error } = await A51_CLIENT.storage.from(bucket).upload(path, file, { upsert:false });
-  if(error) return { ok:false, error };
+  if(error) return { ok:false, error, stage:'producto' };
   return { ok:true, path, name:file.name };
 }
 
@@ -372,16 +378,22 @@ async function a51_upsertProduct(input){
     if(error) return { ok:false, error };
 
     const filesResult = await a51_syncProductFiles(saved.id, input);
-    if(!filesResult.ok) return filesResult;
+    if(!filesResult.ok) return { ...filesResult, stage:'archivos' };
 
     const downloadsResult = await a51_syncProductDownloads(saved.id, input.downloads || []);
-    if(!downloadsResult.ok) return downloadsResult;
+    if(!downloadsResult.ok) return { ...downloadsResult, stage:'descargas' };
 
     const { error:delTagError } = await A51_CLIENT.from('product_tags').delete().eq('product_id', saved.id);
-    if(delTagError) return { ok:false, error:delTagError };
-    if(tagIds.length){
-      const { error:tagError } = await A51_CLIENT.from('product_tags').insert(tagIds.map(tagId => ({ product_id:saved.id, tag_id:tagId })));
-      if(tagError) return { ok:false, error:tagError };
+    if(delTagError) return { ok:false, error:delTagError, stage:'limpieza de etiquetas' };
+    const uniqueTagIds = [...new Set(tagIds)];
+    if(uniqueTagIds.length){
+      const { error:tagError } = await A51_CLIENT
+        .from('product_tags')
+        .upsert(
+          uniqueTagIds.map(tagId => ({ product_id:saved.id, tag_id:tagId })),
+          { onConflict:'product_id,tag_id', ignoreDuplicates:true }
+        );
+      if(tagError) return { ok:false, error:tagError, stage:'etiquetas' };
     }
     return { ok:true, id:saved.id, slug:saved.slug };
   }catch(error){ return { ok:false, error }; }
