@@ -159,7 +159,8 @@ const A51_PRODUCT_SELECT = `
   file_other_path, file_other_name,
   created_at, updated_at,
   categories ( id, name ),
-  product_tags ( tags ( name ) )
+  product_tags ( tags ( name ) ),
+  product_downloads ( id, type, url, status, position )
 `;
 
 function a51_publicCoverUrl(path){
@@ -189,6 +190,15 @@ function a51_mapProductRow(row){
     status: row.status,
     category: row.categories ? row.categories.name : '',
     tags: (row.product_tags || []).map(pt => pt.tags && pt.tags.name).filter(Boolean).join(', '),
+    downloads: (row.product_downloads || [])
+      .map(item => ({
+        id: item.id,
+        type: item.type || 'Otro',
+        url: item.url || '',
+        status: item.status || 'active',
+        position: Number(item.position || 0)
+      }))
+      .sort((a,b) => a.position - b.position),
     cover: row.cover_path ? { path: row.cover_path, name: row.cover_name, url: a51_publicCoverUrl(row.cover_path) } : null,
     files: {
       main:  row.file_main_path  ? { path: row.file_main_path,  name: row.file_main_name }  : null,
@@ -256,7 +266,6 @@ async function a51_syncProductFiles(productId, input){
   const slots = [
     { file:'coverFile', prev:'prevCover', bucket:'covers', pathCol:'cover_path', nameCol:'cover_name' },
     { file:'mainFile', prev:'prevMain', bucket:'product-files', pathCol:'file_main_path', nameCol:'file_main_name' },
-    { file:'notesFile', prev:'prevNotes', bucket:'product-files', pathCol:'file_notes_path', nameCol:'file_notes_name' },
     { file:'otherFile', prev:'prevOther', bucket:'product-files', pathCol:'file_other_path', nameCol:'file_other_name' },
   ];
 
@@ -297,6 +306,47 @@ async function a51_syncProductFiles(productId, input){
 // category, tags, legalBasis, status) + coverFile/mainFile/notesFile/
 // otherFile (File o null) + prevCover/prevMain/prevNotes/prevOther
 // ({path,name} o null, para poder limpiar el archivo reemplazado).
+function a51_isValidDownloadUrl(value){
+  const url = String(value || '').trim();
+  if(!url) return false;
+  if(url.startsWith('magnet:?')) return true;
+  try{
+    const parsed = new URL(url);
+    return ['http:','https:'].includes(parsed.protocol);
+  }catch{
+    return false;
+  }
+}
+
+async function a51_syncProductDownloads(productId, downloads){
+  const clean = (downloads || [])
+    .map((item,index) => ({
+      product_id: productId,
+      type: String(item.type || 'Otro').trim().slice(0,50),
+      url: String(item.url || '').trim(),
+      status: ['active','review','disabled'].includes(item.status) ? item.status : 'active',
+      position: Number.isInteger(item.position) ? item.position : index
+    }))
+    .filter(item => item.url);
+
+  const invalid = clean.find(item => !a51_isValidDownloadUrl(item.url));
+  if(invalid) return { ok:false, error:new Error(`El enlace "${invalid.url}" no es válido.`) };
+
+  const { error:deleteError } = await A51_CLIENT
+    .from('product_downloads')
+    .delete()
+    .eq('product_id', productId);
+  if(deleteError) return { ok:false, error:deleteError };
+
+  if(!clean.length) return { ok:true };
+
+  const { error:insertError } = await A51_CLIENT
+    .from('product_downloads')
+    .insert(clean);
+  if(insertError) return { ok:false, error:insertError };
+  return { ok:true };
+}
+
 async function a51_upsertProduct(input){
   try{
     if(!input.name?.trim()) throw new Error('El nombre es obligatorio.');
@@ -321,6 +371,9 @@ async function a51_upsertProduct(input){
 
     const filesResult = await a51_syncProductFiles(saved.id, input);
     if(!filesResult.ok) return filesResult;
+
+    const downloadsResult = await a51_syncProductDownloads(saved.id, input.downloads || []);
+    if(!downloadsResult.ok) return downloadsResult;
 
     const { error:delTagError } = await A51_CLIENT.from('product_tags').delete().eq('product_id', saved.id);
     if(delTagError) return { ok:false, error:delTagError };
