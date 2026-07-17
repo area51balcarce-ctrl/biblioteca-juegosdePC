@@ -160,7 +160,7 @@ const A51_PRODUCT_SELECT = `
   created_at, updated_at,
   categories ( id, name ),
   product_tags ( tags ( name ) ),
-  product_downloads ( id, type, url, status, position )
+  product_downloads ( id, type, url, status, position, health_status, checked_at )
 `;
 
 function a51_publicCoverUrl(path){
@@ -196,7 +196,9 @@ function a51_mapProductRow(row){
         type: item.type || 'Otro',
         url: item.url || '',
         status: item.status || 'active',
-        position: Number(item.position || 0)
+        position: Number(item.position || 0),
+        healthStatus: item.health_status || 'unchecked',
+        checkedAt: item.checked_at || null
       }))
       .sort((a,b) => a.position - b.position),
     cover: row.cover_path ? { path: row.cover_path, name: row.cover_name, url: a51_publicCoverUrl(row.cover_path) } : null,
