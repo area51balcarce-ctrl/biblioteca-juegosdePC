@@ -101,6 +101,72 @@ async function steamDetails(appId){
   }
 }
 
+
+async function steamGridDbRequest(path, apiKey){
+  if(!apiKey) return null;
+  try{
+    const response = await fetch(`https://www.steamgriddb.com/api/v2${path}`, {
+      headers:{
+        'Accept':'application/json',
+        'Authorization':`Bearer ${apiKey}`
+      }
+    });
+    if(!response.ok){
+      console.warn(`SteamGridDB respondió ${response.status} en ${path}`);
+      return null;
+    }
+    const json = await response.json();
+    return json?.success ? json : null;
+  }catch(error){
+    console.warn('SteamGridDB no disponible.', error);
+    return null;
+  }
+}
+
+function normalizeTitle(value=''){
+  return String(value)
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,' ')
+    .trim();
+}
+
+function pickBestSteamGrid(grids=[]){
+  const allowed = grids.filter(item => item?.url && !item.tags?.some(tag => ['nsfw','humor','epilepsy'].includes(String(tag).toLowerCase())));
+  allowed.sort((a,b) => Number(b.score || 0) - Number(a.score || 0));
+  return allowed[0]?.url || '';
+}
+
+async function getSteamGridDbCover({apiKey, steamId, gameName}){
+  if(!apiKey) return '';
+
+  // La coincidencia por AppID de Steam es la más precisa y evita portadas de juegos homónimos.
+  if(steamId){
+    const bySteam = await steamGridDbRequest(
+      `/grids/steam/${encodeURIComponent(steamId)}?dimensions=600x900,660x930,342x482&types=static&nsfw=false&humor=false&epilepsy=false&limit=50`,
+      apiKey
+    );
+    const exactCover = pickBestSteamGrid(bySteam?.data || []);
+    if(exactCover) return exactCover;
+  }
+
+  // Respaldo: buscar por nombre y elegir la coincidencia textual más cercana.
+  const search = await steamGridDbRequest(`/search/autocomplete/${encodeURIComponent(gameName)}`, apiKey);
+  const games = Array.isArray(search?.data) ? search.data : [];
+  if(!games.length) return '';
+
+  const wanted = normalizeTitle(gameName);
+  const exact = games.find(game => normalizeTitle(game?.name) === wanted);
+  const selected = exact || games[0];
+  if(!selected?.id) return '';
+
+  const grids = await steamGridDbRequest(
+    `/grids/game/${encodeURIComponent(selected.id)}?dimensions=600x900,660x930,342x482&types=static&nsfw=false&humor=false&epilepsy=false&limit=50`,
+    apiKey
+  );
+  return pickBestSteamGrid(grids?.data || []);
+}
+
 async function translateToSpanish(texts, apiKey){
   const originals = texts.map(text => String(text || '').trim());
   const nonEmpty = originals.map((text, index) => ({text, index})).filter(item => item.text);
@@ -150,6 +216,7 @@ module.exports = async function handler(req, res){
   const clientId = process.env.IGDB_CLIENT_ID;
   const clientSecret = process.env.IGDB_CLIENT_SECRET;
   const deeplApiKey = process.env.DEEPL_API_KEY || '';
+  const steamGridDbApiKey = process.env.STEAMGRIDDB_API_KEY || '';
 
   if(!clientId || !clientSecret){
     return send(res,500,{error:'Faltan IGDB_CLIENT_ID y/o IGDB_CLIENT_SECRET en Vercel.'});
@@ -182,6 +249,11 @@ module.exports = async function handler(req, res){
 
       const steamId = (game.websites || []).map(w => parseSteamAppId(w.url)).find(Boolean) || null;
       const steam = await steamDetails(steamId);
+      const steamGridDbCover = await getSteamGridDbCover({
+        apiKey: steamGridDbApiKey,
+        steamId,
+        gameName: game.name
+      });
       const steamMin = stripHtml(steam?.pc_requirements?.minimum || '');
       const steamRec = stripHtml(steam?.pc_requirements?.recommended || '');
       const originalDescription = stripHtml(steam?.short_description || game.summary || game.storyline || '');
@@ -208,11 +280,14 @@ module.exports = async function handler(req, res){
           version: '',
           languages: normalizeLanguages(steam?.supported_languages || ''),
           tags: [...genres, ...developers, ...publishers].filter(Boolean).slice(0,10).join(', '),
-          coverUrl: steam?.header_image || coverUrl(game.cover?.image_id, 'cover_big'),
+          coverUrl: steamGridDbCover || coverUrl(game.cover?.image_id, 'cover_big') || steam?.header_image || '',
           released: game.first_release_date ? new Date(game.first_release_date * 1000).toISOString().slice(0,10) : '',
-          source: deeplApiKey
-            ? (steam ? 'IGDB + Steam + DeepL' : 'IGDB + DeepL')
-            : (steam ? 'IGDB + Steam' : 'IGDB')
+          source: [
+            'IGDB',
+            steam ? 'Steam' : '',
+            deeplApiKey ? 'DeepL' : '',
+            steamGridDbCover ? 'SteamGridDB' : ''
+          ].filter(Boolean).join(' + ')
         }
       });
     }
