@@ -105,6 +105,37 @@
   .trailer-status.missing{ color:#ffc76b; }
   @media (max-width:680px){ .trailer-row{ grid-template-columns:1fr; } }
   @media (max-width:680px){ .smart-row{ grid-template-columns:1fr; } .search-result{ grid-template-columns:54px 1fr; } .search-result .pick{ display:none; } }
+
+  .update-box{ display:none; border:1px solid var(--line-bright); background:rgba(54,255,148,.025); padding:18px; border-radius:2px; }
+  .update-box.show{ display:block; }
+  .update-toolbar{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+  .update-summary{ font-family:var(--f-mono); font-size:11px; color:var(--text-faint); line-height:1.6; }
+  .update-summary strong{ color:var(--accent); }
+  .update-results{ display:grid; gap:8px; margin-top:12px; }
+  .update-panel{ display:none; margin-top:16px; border-top:1px solid var(--line); padding-top:16px; }
+  .update-panel.show{ display:block; }
+  .update-fields{ display:grid; gap:12px; }
+  .update-field{
+    border:1px solid var(--line); background:var(--bg-elev); padding:13px;
+    display:grid; gap:10px;
+  }
+  .update-field-head{ display:flex; gap:10px; align-items:center; justify-content:space-between; }
+  .update-field-title{ font-family:var(--f-mono); font-size:11px; color:var(--text); text-transform:uppercase; letter-spacing:.07em; }
+  .update-field-state{ font-family:var(--f-mono); font-size:10px; color:var(--accent); }
+  .update-choice{ display:flex; gap:8px; align-items:center; font-family:var(--f-mono); font-size:11px; color:var(--text-dim); }
+  .update-choice input{ width:auto; }
+  .update-compare{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .update-value{ border:1px solid var(--line); padding:10px; min-height:62px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; line-height:1.5; color:var(--text-dim); }
+  .update-value.new{ border-color:rgba(54,255,148,.35); color:var(--text); }
+  .update-value-label{ display:block; margin-bottom:6px; font-family:var(--f-mono); font-size:9px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.08em; }
+  .update-cover-pair{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .update-cover-card{ border:1px solid var(--line); padding:10px; }
+  .update-cover-card img{ display:block; width:100%; max-width:180px; aspect-ratio:2/3; object-fit:contain; background:var(--bg); margin-top:8px; }
+  .update-actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:14px; }
+  .update-empty{ font-family:var(--f-mono); font-size:11px; color:var(--text-faint); padding:12px; border:1px dashed var(--line-bright); }
+  @media (max-width:680px){
+    .update-compare,.update-cover-pair{ grid-template-columns:1fr; }
+  }
 </style>
 </head>
 <body>
@@ -138,6 +169,25 @@
           <div class="hint">Busca la ficha, requisitos, idiomas y portada. Todo queda editable antes de guardar.</div>
           <div class="smart-status" id="smart-status"></div>
           <div class="search-results" id="search-results"></div>
+        </div>
+      </div>
+
+      <div class="section" id="update-section" style="display:none">
+        <h2>Actualización inteligente</h2>
+        <div class="update-box show">
+          <div class="update-toolbar">
+            <button type="button" class="btn btn-primary" id="update-search-btn">🔄 Buscar actualización</button>
+            <span class="update-summary" id="update-status">Consulta IGDB, Steam, DeepL y SteamGridDB sin modificar la ficha.</span>
+          </div>
+          <div class="update-results" id="update-results"></div>
+          <div class="update-panel" id="update-panel">
+            <div class="update-summary" id="update-summary"></div>
+            <div class="update-fields" id="update-fields"></div>
+            <div class="update-actions">
+              <button type="button" class="btn btn-primary" id="apply-update-btn">Aplicar campos seleccionados</button>
+              <button type="button" class="btn" id="cancel-update-btn">Cancelar comparación</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -260,6 +310,9 @@
   let currentProduct = null;
   let autoCoverFile = null;
   let autoCoverUrl = null;
+  let pendingUpdateProduct = null;
+  let pendingUpdateCoverFile = null;
+  let pendingUpdateCoverUrl = null;
 
   const fields = ['name','slug','category','status','legalBasis','description','reqMin','reqRec','size','version','languages','trailerUrl','install','notes','changelog','tags','dlc'];
 
@@ -426,6 +479,309 @@
     }
   }
 
+
+  function normalizeCompareValue(value){
+    return String(value ?? '')
+      .replace(/\r\n/g,'\n')
+      .replace(/[ \t]+/g,' ')
+      .replace(/\n{3,}/g,'\n\n')
+      .trim();
+  }
+
+  function valuesDiffer(currentValue, newValue){
+    return normalizeCompareValue(currentValue) !== normalizeCompareValue(newValue);
+  }
+
+  function setUpdateStatus(message, kind=''){
+    const el = document.getElementById('update-status');
+    el.textContent = message;
+    el.style.color = kind === 'error' ? '#ff8080' : kind === 'ok' ? 'var(--accent)' : '';
+  }
+
+  function resetUpdateComparison(){
+    pendingUpdateProduct = null;
+    pendingUpdateCoverFile = null;
+    pendingUpdateCoverUrl = null;
+    document.getElementById('update-results').replaceChildren();
+    document.getElementById('update-fields').replaceChildren();
+    document.getElementById('update-panel').classList.remove('show');
+    document.getElementById('update-summary').textContent = '';
+  }
+
+  function renderUpdateSearchResults(results){
+    const box = document.getElementById('update-results');
+    box.replaceChildren();
+
+    results.forEach(game => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'search-result';
+
+      const img = document.createElement('img');
+      img.alt = '';
+      if(game.coverUrl) img.src = game.coverUrl;
+
+      const text = document.createElement('span');
+      const title = document.createElement('strong');
+      title.textContent = game.name;
+      const meta = document.createElement('small');
+      meta.textContent = [game.released, ...(game.genres || []).slice(0,2)].filter(Boolean).join(' · ');
+      text.append(title,meta);
+
+      const pick = document.createElement('span');
+      pick.className = 'pick';
+      pick.textContent = 'COMPARAR →';
+
+      button.append(img,text,pick);
+      button.addEventListener('click', () => loadUpdateCandidate(game.id));
+      box.append(button);
+    });
+  }
+
+  async function searchProductUpdate(){
+    if(!currentProduct) return;
+
+    resetUpdateComparison();
+    const button = document.getElementById('update-search-btn');
+    button.disabled = true;
+    button.textContent = 'Buscando…';
+    setUpdateStatus(`Buscando “${currentProduct.name}” en IGDB…`);
+
+    try{
+      const response = await fetch(`/api/igdb-data-v2?q=${encodeURIComponent(currentProduct.name)}&mode=update`);
+      const data = await response.json();
+      if(!response.ok) throw new Error(data.error || 'No se pudo buscar la actualización.');
+      if(!data.results?.length){
+        setUpdateStatus('No encontré coincidencias. La ficha actual no fue modificada.','error');
+        return;
+      }
+
+      renderUpdateSearchResults(data.results);
+      setUpdateStatus('Elegí el resultado correcto para comparar.','ok');
+    }catch(error){
+      setUpdateStatus(error.message || 'Falló la búsqueda.','error');
+    }finally{
+      button.disabled = false;
+      button.textContent = '🔄 Buscar actualización';
+    }
+  }
+
+  async function prepareUpdateCover(url, name){
+    pendingUpdateCoverFile = null;
+    pendingUpdateCoverUrl = url || null;
+    if(!url) return;
+
+    try{
+      const response = await fetch(`/api/image-proxy?url=${encodeURIComponent(url)}`);
+      if(!response.ok) throw new Error('No se pudo preparar la nueva portada.');
+      const blob = await response.blob();
+      const ext = blob.type.includes('png') ? 'png' : blob.type.includes('webp') ? 'webp' : 'jpg';
+      pendingUpdateCoverFile = new File(
+        [blob],
+        `${a51_slugify(name || 'portada')}-actualizada.${ext}`,
+        {type:blob.type || 'image/jpeg'}
+      );
+    }catch(error){
+      pendingUpdateCoverFile = null;
+    }
+  }
+
+  function currentCoverUrl(){
+    const preview = document.getElementById('cover-preview');
+    if(preview.classList.contains('show') && preview.src) return preview.src;
+    return currentProduct?.cover?.url || currentProduct?.cover?.publicUrl || currentProduct?.cover?.path || '';
+  }
+
+  function addUpdateTextField(container, config){
+    const { key, label, currentValue, newValue } = config;
+    if(!newValue || !valuesDiffer(currentValue,newValue)) return false;
+
+    const field = document.createElement('div');
+    field.className = 'update-field';
+    field.dataset.updateKey = key;
+
+    const head = document.createElement('div');
+    head.className = 'update-field-head';
+
+    const title = document.createElement('div');
+    title.className = 'update-field-title';
+    title.textContent = label;
+
+    const choice = document.createElement('label');
+    choice.className = 'update-choice';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'update-checkbox';
+    checkbox.checked = true;
+    checkbox.dataset.field = key;
+    choice.append(checkbox, document.createTextNode('Actualizar'));
+
+    head.append(title,choice);
+
+    const compare = document.createElement('div');
+    compare.className = 'update-compare';
+
+    const current = document.createElement('div');
+    current.className = 'update-value';
+    current.innerHTML = '<span class="update-value-label">Actual</span>';
+    current.append(document.createTextNode(normalizeCompareValue(currentValue) || 'Vacío'));
+
+    const fresh = document.createElement('div');
+    fresh.className = 'update-value new';
+    fresh.innerHTML = '<span class="update-value-label">Nuevo</span>';
+    fresh.append(document.createTextNode(normalizeCompareValue(newValue) || 'Vacío'));
+
+    compare.append(current,fresh);
+    field.append(head,compare);
+    container.append(field);
+    return true;
+  }
+
+  function addUpdateCoverField(container, newUrl){
+    const oldUrl = currentCoverUrl();
+    if(!newUrl || normalizeCompareValue(oldUrl) === normalizeCompareValue(newUrl)) return false;
+
+    const field = document.createElement('div');
+    field.className = 'update-field';
+    field.dataset.updateKey = 'cover';
+
+    const head = document.createElement('div');
+    head.className = 'update-field-head';
+
+    const title = document.createElement('div');
+    title.className = 'update-field-title';
+    title.textContent = 'Portada';
+
+    const choice = document.createElement('label');
+    choice.className = 'update-choice';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'update-checkbox';
+    checkbox.checked = true;
+    checkbox.dataset.field = 'cover';
+    choice.append(checkbox, document.createTextNode('Actualizar'));
+
+    head.append(title,choice);
+
+    const pair = document.createElement('div');
+    pair.className = 'update-cover-pair';
+
+    const oldCard = document.createElement('div');
+    oldCard.className = 'update-cover-card';
+    oldCard.innerHTML = '<span class="update-value-label">Actual</span>';
+    if(oldUrl){
+      const img = document.createElement('img');
+      img.src = oldUrl;
+      img.alt = 'Portada actual';
+      oldCard.append(img);
+    }else{
+      oldCard.append(document.createTextNode('Sin portada visible'));
+    }
+
+    const newCard = document.createElement('div');
+    newCard.className = 'update-cover-card';
+    newCard.innerHTML = '<span class="update-value-label">Nueva</span>';
+    const img = document.createElement('img');
+    img.src = newUrl;
+    img.alt = 'Nueva portada';
+    newCard.append(img);
+
+    pair.append(oldCard,newCard);
+    field.append(head,pair);
+    container.append(field);
+    return true;
+  }
+
+  async function loadUpdateCandidate(id){
+    setUpdateStatus('Consultando la ficha completa y comparando datos…');
+    document.getElementById('update-results').replaceChildren();
+    document.getElementById('update-panel').classList.remove('show');
+
+    try{
+      const response = await fetch(`/api/igdb-data-v2?id=${encodeURIComponent(id)}&mode=update`);
+      const data = await response.json();
+      if(!response.ok) throw new Error(data.error || 'No se pudo cargar la ficha nueva.');
+
+      pendingUpdateProduct = data.product || {};
+      await prepareUpdateCover(pendingUpdateProduct.coverUrl, pendingUpdateProduct.name);
+
+      const fieldsBox = document.getElementById('update-fields');
+      fieldsBox.replaceChildren();
+
+      const comparisons = [
+        ['description','Descripción',document.getElementById('description').value,pendingUpdateProduct.description],
+        ['reqMin','Requisitos mínimos',document.getElementById('reqMin').value,pendingUpdateProduct.reqMin],
+        ['reqRec','Requisitos recomendados',document.getElementById('reqRec').value,pendingUpdateProduct.reqRec],
+        ['size','Tamaño aproximado',document.getElementById('size').value,pendingUpdateProduct.size],
+        ['languages','Idiomas',document.getElementById('languages').value,pendingUpdateProduct.languages],
+        ['tags','Etiquetas',document.getElementById('tags').value,pendingUpdateProduct.tags]
+      ];
+
+      let changed = 0;
+      comparisons.forEach(([key,label,currentValue,newValue]) => {
+        if(addUpdateTextField(fieldsBox,{key,label,currentValue,newValue})) changed++;
+      });
+      if(addUpdateCoverField(fieldsBox,pendingUpdateProduct.coverUrl)) changed++;
+
+      const unchanged = comparisons.length + 1 - changed;
+      document.getElementById('update-summary').innerHTML =
+        changed
+          ? `<strong>${changed} cambio${changed === 1 ? '' : 's'} encontrado${changed === 1 ? '' : 's'}.</strong> ${unchanged > 0 ? `${unchanged} campo${unchanged === 1 ? '' : 's'} sin cambios.` : ''} Elegí qué aplicar.`
+          : 'No se encontraron diferencias útiles. La ficha actual no fue modificada.';
+
+      if(!changed){
+        fieldsBox.innerHTML = '<div class="update-empty">IGDB y Steam devolvieron los mismos datos útiles que ya tiene esta ficha.</div>';
+        document.getElementById('apply-update-btn').disabled = true;
+      }else{
+        document.getElementById('apply-update-btn').disabled = false;
+      }
+
+      document.getElementById('update-panel').classList.add('show');
+      setUpdateStatus(`Comparación preparada desde ${pendingUpdateProduct.source || 'IGDB'}.`,'ok');
+    }catch(error){
+      setUpdateStatus(error.message || 'No se pudo preparar la comparación.','error');
+    }
+  }
+
+  async function applySelectedUpdate(){
+    if(!pendingUpdateProduct) return;
+    const selected = [...document.querySelectorAll('#update-fields .update-checkbox:checked')]
+      .map(input => input.dataset.field);
+
+    if(!selected.length){
+      setUpdateStatus('No seleccionaste ningún campo.','error');
+      return;
+    }
+
+    selected.forEach(key => {
+      if(key === 'cover') return;
+      const value = pendingUpdateProduct[key];
+      if(value !== undefined && value !== null && value !== ''){
+        document.getElementById(key).value = value;
+      }
+    });
+
+    if(selected.includes('cover') && pendingUpdateProduct.coverUrl){
+      autoCoverUrl = pendingUpdateProduct.coverUrl;
+      autoCoverFile = pendingUpdateCoverFile;
+      const preview = document.getElementById('cover-preview');
+      preview.src = pendingUpdateProduct.coverUrl;
+      preview.classList.add('show');
+      markFile('cover', pendingUpdateCoverFile ? 'portada actualizada' : 'portada nueva pendiente');
+    }
+
+    const changelog = document.getElementById('changelog');
+    const date = new Date().toISOString().slice(0,10);
+    const note = `${date} — Actualización inteligente desde ${pendingUpdateProduct.source || 'IGDB'} (${selected.join(', ')})`;
+    changelog.value = changelog.value.trim()
+      ? `${changelog.value.trim()}\n${note}`
+      : note;
+
+    setUpdateStatus(`${selected.length} campo${selected.length === 1 ? '' : 's'} aplicado${selected.length === 1 ? '' : 's'} al formulario. Revisá y guardá el producto.`, 'ok');
+    document.getElementById('update-panel').classList.remove('show');
+    document.getElementById('update-results').replaceChildren();
+  }
+
   function renderSearchResults(results){
     const box = document.getElementById('search-results');
     box.replaceChildren();
@@ -539,6 +895,13 @@
     else updateTrailerUi('El enlace ingresado no parece ser de YouTube.','missing');
   });
 
+  document.getElementById('update-search-btn').addEventListener('click', searchProductUpdate);
+  document.getElementById('apply-update-btn').addEventListener('click', applySelectedUpdate);
+  document.getElementById('cancel-update-btn').addEventListener('click', () => {
+    resetUpdateComparison();
+    setUpdateStatus('Comparación cancelada. La ficha no fue modificada.');
+  });
+
   document.getElementById('smart-search-btn').addEventListener('click', searchSmartProduct);
   document.getElementById('smart-query').addEventListener('keydown', event => {
     if(event.key === 'Enter'){ event.preventDefault(); searchSmartProduct(); }
@@ -624,11 +987,19 @@
 
     if(editSlug){
       document.getElementById('smart-section').style.display = 'none';
+      document.getElementById('update-section').style.display = 'block';
       currentProduct = await a51_getProductBySlug(editSlug);
       if(currentProduct){
         document.getElementById('mode-label').textContent = 'Editando registro';
         document.getElementById('page-title').textContent = currentProduct.name;
         fillForm(currentProduct);
+        document.getElementById('smart-query').value = currentProduct.name || '';
+        const existingCoverUrl = currentProduct?.cover?.url || currentProduct?.cover?.publicUrl || '';
+        if(existingCoverUrl){
+          const preview = document.getElementById('cover-preview');
+          preview.src = existingCoverUrl;
+          preview.classList.add('show');
+        }
       } else {
         showError(`No se encontró ningún producto con el slug "${editSlug}".`);
       }
