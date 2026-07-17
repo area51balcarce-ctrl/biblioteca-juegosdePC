@@ -50,6 +50,8 @@
   .copy-btn:hover{ border-color:var(--accent); color:var(--accent); }
   .copy-btn.copied{ border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
   .row-actions{ display:flex; gap:8px; justify-content:flex-end; }
+  .api-actions{ display:flex; flex-wrap:wrap; gap:6px; min-width:205px; }
+  .uuid-short{ font-family:var(--f-mono); font-size:10px; color:var(--text-faint); margin-top:3px; }
   .icon-btn{ font-family:var(--f-mono); font-size:12px; color:var(--text-faint); cursor:pointer; padding:6px; }
   .icon-btn:hover{ color:var(--text); }
   .table-msg{ text-align:center; padding:40px; color:var(--text-faint); font-family:var(--f-mono); font-size:12px; }
@@ -113,7 +115,7 @@
             <th>Versión</th>
             <th>Estado</th>
             <th>Actualizado</th>
-            <th>Enlace</th>
+            <th>Integración</th>
             <th></th>
           </tr>
         </thead>
@@ -129,6 +131,7 @@
 <script src="../assets/config.js"></script>
 <script src="../assets/store.js"></script>
 <script>
+  const SITE_ORIGIN = location.origin;
   const BASE_URL = new URL('../producto/index.html', location.href).href + '?slug=';
   let ALL_PRODUCTS = [];
 
@@ -156,15 +159,17 @@
     body.innerHTML = list.map(g => {
       const coverStyle = g.cover?.url ? `style="background-image:url('${encodeURI(g.cover.url)}');background-size:cover;background-position:center"` : '';
       const slug = encodeURIComponent(g.slug || '');
-      return `<tr><td><div class="game-cell"><div class="game-thumb" ${coverStyle}></div><div><div class="game-name">${esc(g.name || '(sin nombre)')}</div><div class="game-slug">/producto/${esc(g.slug)}</div></div></div></td><td>${esc(g.category || '—')}</td><td class="mono">${esc(g.version || '—')}</td><td>${badge(g.status)}</td><td class="mono">${esc(g.updated || '—')}</td><td><button class="copy-btn" data-url="${esc(BASE_URL + slug)}" onclick="copyLink(this)">Copiar enlace</button></td><td><div class="row-actions"><a class="icon-btn" title="Editar" href="/admin/editor?slug=${slug}">✎</a><button class="icon-btn" type="button" title="Eliminar" data-slug="${esc(g.slug)}" onclick="removeProduct(this.dataset.slug)">🗑</button></div></td></tr>`;
+      const apiUrl = `${SITE_ORIGIN}/api/productos/${encodeURIComponent(g.id)}`;
+      const integrationCode = `fetch('${apiUrl}').then(r=>r.json()).then(({producto})=>{ console.log(producto); });`;
+      return `<tr><td><div class="game-cell"><div class="game-thumb" ${coverStyle}></div><div><div class="game-name">${esc(g.name || '(sin nombre)')}</div><div class="game-slug">/producto/${esc(g.slug)}</div><div class="uuid-short">ID: ${esc(g.id)}</div></div></div></td><td>${esc(g.category || '—')}</td><td class="mono">${esc(g.version || '—')}</td><td>${badge(g.status)}</td><td class="mono">${esc(g.updated || '—')}</td><td><div class="api-actions"><button class="copy-btn" data-copy="${esc(g.id)}" onclick="copyValue(this,'ID copiado ✓')">Copiar ID</button><button class="copy-btn" data-copy="${esc(BASE_URL + slug)}" onclick="copyValue(this,'Enlace copiado ✓')">Copiar enlace</button><button class="copy-btn" data-copy="${esc(integrationCode)}" onclick="copyValue(this,'Código copiado ✓')">Copiar integración</button></div></td><td><div class="row-actions"><a class="icon-btn" title="Editar" href="/admin/editor?slug=${slug}">✎</a><button class="icon-btn" type="button" title="Eliminar" data-slug="${esc(g.slug)}" onclick="removeProduct(this.dataset.slug)">🗑</button></div></td></tr>`;
     }).join('');
   }
 
-  function copyLink(btn){
-    const url = btn.getAttribute('data-url');
-    navigator.clipboard?.writeText(url).catch(()=>{});
+  function copyValue(btn, successText){
+    const value = btn.getAttribute('data-copy') || '';
+    navigator.clipboard?.writeText(value).catch(()=>{});
     const original = btn.textContent;
-    btn.textContent = "Copiado ✓";
+    btn.textContent = successText || "Copiado ✓";
     btn.classList.add('copied');
     setTimeout(()=>{ btn.textContent = original; btn.classList.remove('copied'); }, 1600);
   }
