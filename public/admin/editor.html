@@ -43,6 +43,29 @@
   .actions-bar{ display:flex; gap:12px; margin-top:10px; align-items:center; }
   .save-feedback{ font-family:var(--f-mono); font-size:12px; color:var(--accent); opacity:0; transition:opacity .2s; }
   .save-feedback.show{ opacity:1; }
+  .downloads-manager{ display:grid; gap:12px; }
+  .download-row{
+    display:grid;
+    grid-template-columns:minmax(135px,.8fr) minmax(240px,2fr) minmax(110px,.7fr) auto;
+    gap:10px;
+    align-items:center;
+    padding:12px;
+    border:1px solid var(--line);
+    background:var(--bg-elev);
+  }
+  .download-row input,.download-row select{ margin:0; }
+  .download-remove{ white-space:nowrap; }
+  .downloads-empty{
+    padding:15px;
+    border:1px dashed var(--line-bright);
+    color:var(--text-faint);
+    font-family:var(--f-mono);
+    font-size:12px;
+  }
+  .downloads-help{ display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; }
+  @media (max-width:760px){
+    .download-row{ grid-template-columns:1fr; }
+  }
   .form-error{
     display:none; font-family:var(--f-mono); font-size:12px; color:#ff8080;
     background:rgba(255,93,93,.08); border:1px solid rgba(255,93,93,.35); border-radius:2px;
@@ -192,25 +215,31 @@
       </div>
 
       <div class="section">
-        <h2>Archivos</h2>
+        <h2>Administrador de descargas</h2>
+        <div class="downloads-help">
+          <div class="hint">Guardá enlaces directos, mirrors o magnet links. Podés agregar todos los que necesites.</div>
+          <button type="button" class="btn" id="add-download-btn">＋ Agregar enlace</button>
+        </div>
+        <div class="downloads-manager" id="downloads-manager"></div>
+        <div class="downloads-empty" id="downloads-empty">Todavía no agregaste enlaces de descarga.</div>
+      </div>
+
+      <div class="section">
+        <h2>Archivos auxiliares</h2>
         <div class="field">
           <label for="cover">Portada (imagen)</label>
           <div class="file-row"><input type="file" id="cover" accept="image/*"><span class="file-status" id="cover-status">sin archivo</span></div>
           <img id="cover-preview" class="cover-preview" alt="Vista previa de portada">
         </div>
         <div class="field">
-          <label for="mainFile">Archivo principal</label>
-          <div class="file-row"><input type="file" id="mainFile"><span class="file-status" id="mainFile-status">sin archivo</span></div>
+          <label for="mainFile">Torrent u otro archivo pequeño</label>
+          <div class="file-row"><input type="file" id="mainFile" accept=".torrent,.zip,.rar,.7z"><span class="file-status" id="mainFile-status">sin archivo</span></div>
         </div>
         <div class="field">
-          <label for="notesFile">Archivo de notas / enlaces</label>
-          <div class="file-row"><input type="file" id="notesFile"><span class="file-status" id="notesFile-status">sin archivo</span></div>
-        </div>
-        <div class="field">
-          <label for="otherFile">Otro archivo relacionado</label>
+          <label for="otherFile">Otro archivo relacionado (opcional)</label>
           <div class="file-row"><input type="file" id="otherFile"><span class="file-status" id="otherFile-status">sin archivo</span></div>
         </div>
-        <div class="hint">Si no cargás un archivo nuevo en un campo, se conserva el que ya estaba guardado.</div>
+        <div class="hint">Los TXT de enlaces ya no son necesarios. Si no cargás un archivo nuevo, se conserva el anterior.</div>
       </div>
 
       <div class="actions-bar">
@@ -239,9 +268,9 @@
     if(product.cover) markFile('cover', product.cover.name || 'portada guardada');
     if(product.files){
       if(product.files.main) markFile('mainFile', product.files.main.name);
-      if(product.files.notes) markFile('notesFile', product.files.notes.name);
       if(product.files.other) markFile('otherFile', product.files.other.name);
     }
+    fillDownloads(product.downloads || []);
   }
 
   function markFile(id, label){
@@ -269,6 +298,84 @@
     if(value === undefined || value === null || value === '') return;
     const el = document.getElementById(id);
     if(el) el.value = value;
+  }
+
+  const DOWNLOAD_TYPES = [
+    'Torrent','Mega','MediaFire','Google Drive','1Fichier',
+    'Qiwi','GoFile','Buzzheavier','Pixeldrain','Otro'
+  ];
+
+  function createDownloadRow(download={}){
+    const row = document.createElement('div');
+    row.className = 'download-row';
+
+    const type = document.createElement('select');
+    type.className = 'download-type';
+    type.setAttribute('aria-label','Tipo de descarga');
+    DOWNLOAD_TYPES.forEach(name => {
+      const option = document.createElement('option');
+      option.value = name;
+      option.textContent = name;
+      type.append(option);
+    });
+    type.value = DOWNLOAD_TYPES.includes(download.type) ? download.type : 'Otro';
+
+    const url = document.createElement('input');
+    url.type = 'text';
+    url.className = 'download-url';
+    url.placeholder = 'https://... o magnet:?xt=...';
+    url.value = download.url || '';
+    url.setAttribute('aria-label','Enlace de descarga');
+
+    const status = document.createElement('select');
+    status.className = 'download-status';
+    status.setAttribute('aria-label','Estado del enlace');
+    [
+      ['active','✓ Activo'],
+      ['review','⚠ Revisar'],
+      ['disabled','⏸ Desactivado']
+    ].forEach(([value,label]) => {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = label;
+      status.append(option);
+    });
+    status.value = download.status || 'active';
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'btn download-remove';
+    remove.textContent = 'Eliminar';
+    remove.addEventListener('click', () => {
+      row.remove();
+      updateDownloadsEmptyState();
+    });
+
+    row.append(type,url,status,remove);
+    document.getElementById('downloads-manager').append(row);
+    updateDownloadsEmptyState();
+  }
+
+  function updateDownloadsEmptyState(){
+    const hasRows = document.querySelectorAll('#downloads-manager .download-row').length > 0;
+    document.getElementById('downloads-empty').style.display = hasRows ? 'none' : 'block';
+  }
+
+  function fillDownloads(downloads=[]){
+    document.getElementById('downloads-manager').replaceChildren();
+    (downloads || []).forEach(createDownloadRow);
+    updateDownloadsEmptyState();
+  }
+
+  function collectDownloads(){
+    return [...document.querySelectorAll('#downloads-manager .download-row')]
+      .map((row,index) => ({
+        type: row.querySelector('.download-type').value,
+        url: row.querySelector('.download-url').value.trim(),
+        status: row.querySelector('.download-status').value,
+        position: index
+      }))
+      .filter(item => item.url);
   }
 
   function isYoutubeUrl(value){
@@ -418,6 +525,8 @@
     }
   }
 
+  document.getElementById('add-download-btn').addEventListener('click', () => createDownloadRow());
+
   document.getElementById('trailer-search-btn').addEventListener('click', () => searchGameTrailer());
   document.getElementById('trailer-view-btn').addEventListener('click', () => {
     const url = document.getElementById('trailerUrl').value.trim();
@@ -452,7 +561,7 @@
     document.getElementById('slug-preview').textContent = e.target.value || '…';
   });
 
-  ['cover','mainFile','notesFile','otherFile'].forEach(id => {
+  ['cover','mainFile','otherFile'].forEach(id => {
     document.getElementById(id).addEventListener('change', (e) => {
       const f = e.target.files[0];
       if(f){
@@ -481,13 +590,12 @@
 
     input.coverFile = document.getElementById('cover').files[0] || autoCoverFile || null;
     input.mainFile = document.getElementById('mainFile').files[0] || null;
-    input.notesFile = document.getElementById('notesFile').files[0] || null;
     input.otherFile = document.getElementById('otherFile').files[0] || null;
+    input.downloads = collectDownloads();
 
     input.id = currentProduct?.id || null;
     input.prevCover = currentProduct?.cover || null;
     input.prevMain = currentProduct?.files?.main || null;
-    input.prevNotes = currentProduct?.files?.notes || null;
     input.prevOther = currentProduct?.files?.other || null;
 
     const result = await a51_upsertProduct(input);
@@ -510,6 +618,7 @@
     if(!session) return;
 
     await populateCategoryOptions();
+    updateDownloadsEmptyState();
 
     if(editSlug){
       document.getElementById('smart-section').style.display = 'none';
