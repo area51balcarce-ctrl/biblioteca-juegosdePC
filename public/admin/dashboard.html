@@ -29,6 +29,14 @@
   .stat{ padding:16px 18px; }
   .stat .n{ font-family:var(--f-display); font-size:26px; font-weight:600; }
   .stat .l{ font-family:var(--f-mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--text-faint); margin-top:4px; }
+  .stat-action{ cursor:pointer; transition:border-color .18s, background .18s; }
+  .stat-action:hover,.stat-action.active{ border-color:#ffc76b; background:rgba(255,199,107,.055); }
+  .stat-action .n{ color:#ffc76b; }
+  .availability-summary{ min-width:175px; display:grid; gap:7px; }
+  .backup-line{ display:flex; align-items:center; gap:6px; font-family:var(--f-mono); font-size:10px; }
+  .backup-line.yes{ color:var(--accent); }
+  .backup-line.no{ color:var(--text-faint); }
+  .availability-alert{ font-family:var(--f-mono); font-size:10px; color:#ff8080; line-height:1.35; }
   @media (max-width:760px){ .stat-row{ grid-template-columns:repeat(2,1fr); } }
 
   .toolbar{ display:flex; gap:12px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
@@ -113,7 +121,7 @@
     <div class="stat-row">
       <div class="panel stat"><div class="n" id="stat-published">0</div><div class="l">Productos publicados</div></div>
       <div class="panel stat"><div class="n" id="stat-draft">0</div><div class="l">En borrador</div></div>
-      <div class="panel stat"><div class="n" id="stat-cats">0</div><div class="l">Categorías activas</div></div>
+      <div class="panel stat stat-action" id="stat-problems-card" role="button" tabindex="0" title="Mostrar solamente juegos que necesitan atención"><div class="n" id="stat-problems">0</div><div class="l">Juegos con problemas</div></div>
       <div class="panel stat"><div class="n" id="stat-total">0</div><div class="l">Total en catálogo</div></div>
     </div>
 
@@ -129,6 +137,14 @@
         <option value="ok">Publicado</option>
         <option value="draft">Borrador</option>
       </select>
+      <select id="filter-availability">
+        <option value="">Disponibilidad — todas</option>
+        <option value="problem">Necesitan atención</option>
+        <option value="covered">Con respaldo torrent</option>
+        <option value="no-torrent">Sin torrent</option>
+        <option value="links">Con enlaces</option>
+        <option value="no-links">Sin enlaces</option>
+      </select>
     </div>
 
     <div class="panel">
@@ -140,7 +156,7 @@
             <th>Versión</th>
             <th>Estado</th>
             <th>Actualizado</th>
-            <th>Descargas</th>
+            <th>Disponibilidad</th>
             <th>Integración</th>
             <th></th>
           </tr>
@@ -169,10 +185,31 @@
       : '<span class="badge badge-warn">Borrador</span>';
   }
 
+  function hasTorrent(product){
+    const main = product?.files?.main;
+    if(!main) return false;
+    const name = String(main.name || '').toLowerCase();
+    return name.endsWith('.torrent') || name.includes('torrent');
+  }
+
+  function availabilityState(product){
+    const downloads = (product.downloads || []).filter(item => item.status !== 'disabled');
+    const counts = { active:0, review:0, down:0, unchecked:0 };
+    downloads.forEach(item => {
+      const key = item.healthStatus || 'unchecked';
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    const torrent = hasTorrent(product);
+    const noWorkingSource = !torrent && downloads.length > 0 && counts.down === downloads.length;
+    const noSource = !torrent && downloads.length === 0;
+    const problem = counts.review > 0 || counts.down > 0 || noWorkingSource || noSource;
+    return { downloads, counts, torrent, problem, noWorkingSource, noSource };
+  }
+
   function updateStats(list){
     document.getElementById('stat-published').textContent = list.filter(g => g.status === 'ok').length;
     document.getElementById('stat-draft').textContent = list.filter(g => g.status !== 'ok').length;
-    document.getElementById('stat-cats').textContent = new Set(list.map(g => g.category).filter(Boolean)).size;
+    document.getElementById('stat-problems').textContent = list.filter(g => availabilityState(g).problem).length;
     document.getElementById('stat-total').textContent = list.length;
   }
 
@@ -185,17 +222,26 @@
     }[status] || '⚪ Sin revisar';
   }
 
-  function downloadSummary(downloads=[]){
-    const enabled = downloads.filter(d => d.status !== 'disabled');
-    const counts = { active:0, review:0, down:0, unchecked:0, disabled:downloads.length-enabled.length };
-    enabled.forEach(d => counts[d.healthStatus || 'unchecked'] = (counts[d.healthStatus || 'unchecked'] || 0) + 1);
-    if(!downloads.length) return '<div class="health-pill off">Sin enlaces</div>';
-    return `<div class="health-counts">
-      ${counts.active ? `<span class="health-pill ok">${counts.active} activos</span>` : ''}
-      ${counts.review ? `<span class="health-pill review">${counts.review} revisar</span>` : ''}
-      ${counts.down ? `<span class="health-pill down">${counts.down} caídos</span>` : ''}
-      ${counts.unchecked ? `<span class="health-pill off">${counts.unchecked} sin revisar</span>` : ''}
-      ${counts.disabled ? `<span class="health-pill off">${counts.disabled} desactivados</span>` : ''}
+  function downloadSummary(product){
+    const state = availabilityState(product);
+    const allDownloads = product.downloads || [];
+    const disabled = allDownloads.filter(item => item.status === 'disabled').length;
+    let alert = '';
+    if(state.noSource) alert = '<div class="availability-alert">⚠ Sin enlaces ni torrent de respaldo</div>';
+    else if(state.noWorkingSource) alert = '<div class="availability-alert">⚠ Todos los enlaces están caídos y no hay torrent</div>';
+    else if(state.counts.down && state.torrent) alert = '<div class="availability-alert">Hay enlaces caídos, pero existe respaldo torrent</div>';
+
+    return `<div class="availability-summary">
+      <div class="backup-line ${state.torrent ? 'yes' : 'no'}">${state.torrent ? '🧲 Torrent de respaldo ✓' : '○ Sin torrent de respaldo'}</div>
+      <div class="health-counts">
+        ${!state.downloads.length ? '<span class="health-pill off">Sin enlaces</span>' : ''}
+        ${state.counts.active ? `<span class="health-pill ok">${state.counts.active} activos</span>` : ''}
+        ${state.counts.review ? `<span class="health-pill review">${state.counts.review} revisar</span>` : ''}
+        ${state.counts.down ? `<span class="health-pill down">${state.counts.down} caídos</span>` : ''}
+        ${state.counts.unchecked ? `<span class="health-pill off">${state.counts.unchecked} sin revisar</span>` : ''}
+        ${disabled ? `<span class="health-pill off">${disabled} desactivados</span>` : ''}
+      </div>
+      ${alert}
     </div>`;
   }
 
@@ -226,7 +272,7 @@
         <td class="mono">${esc(g.version || '—')}</td>
         <td>${badge(g.status)}</td>
         <td class="mono">${esc(g.updated || '—')}</td>
-        <td><div class="download-summary">${downloadSummary(downloads)}<div class="health-actions"><button class="health-btn" type="button" onclick="toggleDownloads('${esc(g.id)}')">Ver enlaces</button><button class="health-btn" type="button" onclick="verifyDownloads(this,'${esc(g.id)}')" ${downloads.length ? '' : 'disabled'}>Verificar</button></div></div></td>
+        <td><div class="download-summary">${downloadSummary(g)}<div class="health-actions"><button class="health-btn" type="button" onclick="toggleDownloads('${esc(g.id)}')" ${downloads.length ? '' : 'disabled'}>Ver enlaces</button><button class="health-btn" type="button" onclick="verifyDownloads(this,'${esc(g.id)}')" ${downloads.length ? '' : 'disabled'}>Verificar</button></div></div></td>
         <td><div class="api-actions"><button class="copy-btn" data-copy="${esc(g.id)}" onclick="copyValue(this,'ID copiado ✓')">Copiar ID</button><button class="copy-btn" data-copy="${esc(BASE_URL + slug)}" onclick="copyValue(this,'Enlace copiado ✓')">Copiar enlace</button><button class="copy-btn" data-copy="${esc(integrationCode)}" onclick="copyValue(this,'Código copiado ✓')">Copiar integración</button></div></td>
         <td><div class="row-actions"><a class="icon-btn" title="Editar" href="/admin/editor?slug=${slug}">✎</a><button class="icon-btn" type="button" title="Eliminar" data-slug="${esc(g.slug)}" onclick="removeProduct(this.dataset.slug)">🗑</button></div></td>
       </tr>
@@ -299,12 +345,24 @@
     const q = document.getElementById('search').value.toLowerCase();
     const cat = document.getElementById('filter-cat').value;
     const status = document.getElementById('filter-status').value;
+    const availability = document.getElementById('filter-availability').value;
     updateStats(ALL_PRODUCTS);
-    const filtered = ALL_PRODUCTS.filter(g =>
-      (!q || (g.name||'').toLowerCase().includes(q) || (g.slug||'').includes(q)) &&
-      (!cat || g.category === cat) &&
-      (!status || g.status === status)
-    );
+    const filtered = ALL_PRODUCTS.filter(g => {
+      const state = availabilityState(g);
+      const availabilityMatch =
+        !availability ||
+        (availability === 'problem' && state.problem) ||
+        (availability === 'covered' && state.torrent) ||
+        (availability === 'no-torrent' && !state.torrent) ||
+        (availability === 'links' && state.downloads.length > 0) ||
+        (availability === 'no-links' && state.downloads.length === 0);
+
+      return (!q || (g.name||'').toLowerCase().includes(q) || (g.slug||'').includes(q)) &&
+        (!cat || g.category === cat) &&
+        (!status || g.status === status) &&
+        availabilityMatch;
+    });
+    document.getElementById('stat-problems-card').classList.toggle('active', availability === 'problem');
     render(filtered);
   }
 
@@ -333,6 +391,18 @@
   document.getElementById('search').addEventListener('input', applyFilters);
   document.getElementById('filter-cat').addEventListener('change', applyFilters);
   document.getElementById('filter-status').addEventListener('change', applyFilters);
+  document.getElementById('filter-availability').addEventListener('change', applyFilters);
+  document.getElementById('stat-problems-card').addEventListener('click', () => {
+    const select = document.getElementById('filter-availability');
+    select.value = select.value === 'problem' ? '' : 'problem';
+    applyFilters();
+  });
+  document.getElementById('stat-problems-card').addEventListener('keydown', event => {
+    if(event.key === 'Enter' || event.key === ' '){
+      event.preventDefault();
+      document.getElementById('stat-problems-card').click();
+    }
+  });
   document.getElementById('logout-btn').addEventListener('click', async () => {
     await a51_signOut();
     window.location.href = 'index.html';
