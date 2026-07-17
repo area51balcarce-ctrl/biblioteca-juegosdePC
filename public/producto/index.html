@@ -71,8 +71,6 @@
   .modal-head h2{ margin:0; font-family:var(--f-mono); font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); }
   .modal-close{ width:38px; height:38px; border:1px solid var(--line-bright); background:transparent; color:var(--text); font-size:22px; cursor:pointer; }
   .modal-body{ padding:20px; }
-  .video-wrap{ position:relative; width:100%; aspect-ratio:16/9; background:#000; }
-  .video-wrap iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; }
   body.modal-open{ overflow:hidden; }
 
   .tag{ font-family:var(--f-mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; padding:4px 9px; border:1px solid var(--line-bright); color:var(--text-dim); }
@@ -142,39 +140,26 @@
     return value;
   }
 
-  function getYouTubeEmbedUrl(value){
-    const raw = String(value || '').trim();
-    if(!raw) return '';
+  function publicInstallText(value){
+    const text = String(value || '').trim();
+    if(!text) return '';
 
-    // También acepta que en el CMS se haya guardado solamente el ID del video.
-    if(/^[a-zA-Z0-9_-]{11}$/.test(raw)){
-      return `https://www.youtube.com/embed/${encodeURIComponent(raw)}?autoplay=1`;
+    const legacy = text
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if(
+      legacy === 'descargar el txt y ver los enlaces para luego descargar el juego' ||
+      legacy.includes('descargar el txt') ||
+      legacy.includes('abrir el txt')
+    ){
+      return 'Elegí uno de los servidores disponibles, descargá el juego y seguí las instrucciones incluidas para completar la instalación.';
     }
 
-    try{
-      const parsed = new URL(raw);
-      const host = parsed.hostname.replace(/^www\./, '').toLowerCase();
-      let id = '';
-
-      if(host === 'youtu.be'){
-        id = parsed.pathname.replace(/^\/+/, '').split('/')[0];
-      }else if(host.endsWith('youtube.com')){
-        if(parsed.pathname === '/watch'){
-          id = parsed.searchParams.get('v') || '';
-        }else{
-          const parts = parsed.pathname.split('/').filter(Boolean);
-          if(['embed', 'shorts', 'live'].includes(parts[0])){
-            id = parts[1] || '';
-          }
-        }
-      }
-
-      id = id.split(/[?&/]/)[0];
-      return id ? `https://www.youtube.com/embed/${encodeURIComponent(id)}?autoplay=1` : '';
-    }catch{
-      return '';
-    }
+    return text;
   }
+
 
   function openModal(id){
     const modal = document.getElementById(id);
@@ -189,10 +174,6 @@
     modal.classList.remove('open');
     modal.setAttribute('aria-hidden', 'true');
 
-    if(modal.id === 'trailer-modal'){
-      const iframe = modal.querySelector('iframe');
-      if(iframe) iframe.src = '';
-    }
 
     if(!document.querySelector('.modal.open')){
       document.body.classList.remove('modal-open');
@@ -215,22 +196,6 @@
       openModal('downloads-modal');
     });
 
-    document.getElementById('open-trailer')?.addEventListener('click', ()=>{
-      const button = document.getElementById('open-trailer');
-      const directUrl = button?.dataset.trailerUrl || '';
-      const modal = document.getElementById('trailer-modal');
-      const iframe = modal?.querySelector('iframe');
-
-      if(modal && iframe && modal.dataset.trailerSrc){
-        iframe.src = modal.dataset.trailerSrc;
-        openModal('trailer-modal');
-        return;
-      }
-
-      if(directUrl){
-        window.open(directUrl, '_blank', 'noopener,noreferrer');
-      }
-    });
 
     document.querySelectorAll('[data-close-modal]').forEach(el=>{
       el.addEventListener('click', ()=>{
@@ -248,8 +213,7 @@
     const activeDownloads = (g.downloads || []).filter(item =>
       item && item.url && item.status !== 'disabled'
     );
-    const trailerUrl = String(g.trailerUrl || '').trim();
-    const trailerEmbedUrl = getYouTubeEmbedUrl(trailerUrl);
+    const installText = publicInstallText(g.install);
 
     const coverSrc = g.cover ? g.cover.url
       : "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='533'><rect width='100%25' height='100%25' fill='%23131a18'/><text x='50%25' y='50%25' fill='%2339ff9d' font-family='monospace' font-size='16' text-anchor='middle'>SIN PORTADA</text></svg>";
@@ -278,7 +242,6 @@
 
             <div class="cta-row">
               ${activeDownloads.length ? `<button class="btn btn-primary" id="open-downloads" type="button">↓ Ir a descargas</button>` : ''}
-              ${trailerUrl ? `<button class="btn" id="open-trailer" type="button" data-trailer-url="${esc(trailerUrl)}">▶ Ver tráiler</button>` : ''}
             </div>
           </div>
         </div>
@@ -296,10 +259,10 @@
             <div class="req-set" data-set="rec">${esc(g.reqRec) || 'No especificados.'}</div>
           </div>
 
-          ${g.install ? `
+          ${installText ? `
           <div class="block">
             <h2>Instrucciones de instalación</h2>
-            <div class="prose">${esc(g.install)}</div>
+            <div class="prose">${esc(installText)}</div>
           </div>` : ''}
 
           ${g.notes ? `
@@ -365,26 +328,6 @@
           </div>
         </div>
       </div>
-
-      ${trailerEmbedUrl ? `
-      <div class="modal" id="trailer-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="trailer-title" data-trailer-src="${esc(trailerEmbedUrl)}">
-        <div class="modal-backdrop" data-close-modal></div>
-        <div class="modal-card">
-          <div class="modal-head">
-            <h2 id="trailer-title">Tráiler</h2>
-            <button class="modal-close" type="button" aria-label="Cerrar" data-close-modal>×</button>
-          </div>
-          <div class="modal-body">
-            <div class="video-wrap">
-              <iframe
-                title="Tráiler de ${esc(g.name)}"
-                allow="autoplay; encrypted-media; picture-in-picture"
-                allowfullscreen>
-              </iframe>
-            </div>
-          </div>
-        </div>
-      </div>` : ''}
     `;
 
     bindInteractions();
