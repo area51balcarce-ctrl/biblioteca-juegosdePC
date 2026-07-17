@@ -30,7 +30,7 @@ module.exports = async function handler(req, res){
   }
 
   const select = [
-    'id','slug','name','description','req_min','req_rec','size','version','languages',
+    'id','slug','name','description','req_min','req_rec','size','version','languages','trailer_url',
     'install','notes','changelog','dlc','legal_basis','status','cover_path','updated_at',
     'categories(name)','product_tags(tags(name))'
   ].join(',');
@@ -79,6 +79,7 @@ module.exports = async function handler(req, res){
         tamano: row.size || '',
         version: row.version || '',
         idiomas: row.languages || '',
+        trailer_url: row.trailer_url || '',
         instrucciones: row.install || '',
         notas: row.notes || '',
         changelog: row.changelog || '',
