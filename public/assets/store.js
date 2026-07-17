@@ -217,6 +217,16 @@ async function a51_getProductBySlug(slug){
   return a51_mapProductRow(data);
 }
 
+async function a51_getProductById(id){
+  const { data, error } = await A51_CLIENT
+    .from('products')
+    .select(A51_PRODUCT_SELECT)
+    .eq('id', id)
+    .maybeSingle();
+  if(error){ console.error(error); return null; }
+  return a51_mapProductRow(data);
+}
+
 function a51_safeFileName(name){
   return name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
 }
