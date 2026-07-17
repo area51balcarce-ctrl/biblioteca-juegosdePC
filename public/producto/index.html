@@ -54,11 +54,12 @@
   .kv span:first-child{ color:var(--text-faint); }
   .kv span:last-child{ font-family:var(--f-mono); text-align:right; }
 
+
   .download-list{ display:flex; flex-direction:column; gap:10px; }
   .dl-item{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding:13px 14px; border:1px solid var(--line-bright); }
   .dl-item .lbl{ display:flex; flex-direction:column; gap:2px; min-width:0; }
   .dl-item .lbl b{ font-size:13.5px; font-weight:600; }
-  .dl-item .lbl small{ font-family:var(--f-mono); font-size:10.5px; color:var(--text-faint); overflow-wrap:anywhere; }
+  .dl-item .lbl small{ font-family:var(--f-mono); font-size:10.5px; color:var(--text-faint); }
   .dl-item .btn{ padding:8px 14px; font-size:11px; flex:none; }
   .dl-empty{ font-family:var(--f-mono); font-size:12px; color:var(--text-faint); padding:8px 0; }
 
@@ -114,13 +115,127 @@
     "dominio-publico": "Dominio público / libre", reventa: "Licencia de reventa", propio: "Contenido propio",
   };
 
-  function esc(s){ return (s || '').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function esc(s){
+    return (s || '').toString().replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
 
   function renderEmpty(reason){
+    document.getElementById('app').innerHTML = `
+      <div class="empty-state">
+        <div class="eyebrow">Sin datos</div>
+        <h1>${esc(reason)}</h1>
+        <p>Esta página se arma a partir del catálogo. Si el producto existe pero no aparece, puede que todavía esté en borrador — solo los productos publicados son visibles en un enlace público.</p>
+        <a class="btn btn-primary" href="/admin/dashboard">← Volver al panel</a>
+      </div>
+    `;
+  }
+
+  function downloadLabel(type){
+    const value = String(type || 'Otro').trim();
+    const key = value.toLowerCase();
+    if(key.includes('mediafire')) return '🟦 MediaFire';
+    if(key.includes('pixeldrain')) return '🟪 Pixeldrain';
+    if(key.includes('akirabox')) return '🟢 AkiraBox';
+    if(key.includes('torrent') || key.includes('magnet')) return '🧲 Torrent';
+    return value;
+  }
+
+  function getYouTubeEmbedUrl(value){
+    const raw = String(value || '').trim();
+    if(!raw) return '';
+
+    try{
+      const parsed = new URL(raw);
+      let id = '';
+
+      if(parsed.hostname.includes('youtu.be')){
+        id = parsed.pathname.replace(/^\/+/, '');
+      }else if(parsed.hostname.includes('youtube.com')){
+        if(parsed.pathname === '/watch') id = parsed.searchParams.get('v') || '';
+        else if(parsed.pathname.startsWith('/embed/')) id = parsed.pathname.split('/embed/')[1] || '';
+        else if(parsed.pathname.startsWith('/shorts/')) id = parsed.pathname.split('/shorts/')[1] || '';
+      }
+
+      id = id.split(/[?&/]/)[0];
+      return id ? `https://www.youtube.com/embed/${encodeURIComponent(id)}?autoplay=1` : '';
+    }catch{
+      return '';
+    }
+  }
+
+  function openModal(id){
+    const modal = document.getElementById(id);
+    if(!modal) return;
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+  }
+
+  function closeModal(modal){
+    if(!modal) return;
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+
+    if(modal.id === 'trailer-modal'){
+      const iframe = modal.querySelector('iframe');
+      if(iframe) iframe.src = '';
+    }
+
+    if(!document.querySelector('.modal.open')){
+      document.body.classList.remove('modal-open');
+    }
+  }
+
+  function bindInteractions(){
+    document.querySelectorAll('.req-toggle button').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        document.querySelectorAll('.req-toggle button').forEach(b=>b.classList.remove('active'));
+        document.querySelectorAll('.req-set').forEach(s=>s.classList.remove('active'));
+        btn.classList.add('active');
+
+        const target = document.querySelector(`.req-set[data-set="${btn.dataset.req}"]`);
+        if(target) target.classList.add('active');
+      });
+    });
+
+    document.getElementById('open-downloads')?.addEventListener('click', ()=>{
+      openModal('downloads-modal');
+    });
+
+    document.getElementById('open-trailer')?.addEventListener('click', ()=>{
+      const modal = document.getElementById('trailer-modal');
+      const iframe = modal?.querySelector('iframe');
+      if(!modal || !iframe) return;
+
+      iframe.src = modal.dataset.trailerSrc || '';
+      openModal('trailer-modal');
+    });
+
+    document.querySelectorAll('[data-close-modal]').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        closeModal(el.closest('.modal'));
+      });
+    });
+  }
+
+  async function renderGame(g){
+    document.getElementById('page-title').textContent = `${g.name || 'Producto'} — ÁREA 51`;
+    document.title = `${g.name || 'Producto'} — ÁREA 51`;
+
+    const tags = (g.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+    const changelogLines = (g.changelog || '').split('\n').map(l => l.trim()).filter(Boolean);
     const activeDownloads = (g.downloads || []).filter(item =>
-      item.url && item.status !== 'disabled'
+      item && item.url && item.status !== 'disabled'
     );
     const trailerEmbedUrl = getYouTubeEmbedUrl(g.trailerUrl);
+
+    const coverSrc = g.cover ? g.cover.url
+      : "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='533'><rect width='100%25' height='100%25' fill='%23131a18'/><text x='50%25' y='50%25' fill='%2339ff9d' font-family='monospace' font-size='16' text-anchor='middle'>SIN PORTADA</text></svg>";
+
+    document.getElementById('footer-legal').textContent =
+      `ÁREA 51 // Distribución: ${LEGAL_LABELS[g.legalBasis] || 'sin definir'}`;
 
     document.getElementById('app').innerHTML = `
       <section class="hero">
@@ -129,15 +244,18 @@
             <img class="cover" alt="Portada de ${esc(g.name)}" src="${coverSrc}">
             <div class="cover-scan"></div>
           </div>
+
           <div class="title-block">
-            <div class="eyebrow">${g.status === 'ok' ? 'Registro disponible' : 'Borrador — vista previa'}</div>
+            <div class="eyebrow">${g.status === 'ok' ? 'Registro disponible' : 'Producto disponible'}</div>
             <h1>${esc(g.name) || '(sin nombre)'}</h1>
             <p class="subtitle">${esc(g.description) || 'Sin descripción cargada todavía.'}</p>
+
             <div class="meta-row">
               <span class="badge badge-ok">${LEGAL_LABELS[g.legalBasis] || 'Sin base legal definida'}</span>
               ${g.version ? `<span class="badge badge-off">v${esc(g.version)}</span>` : ''}
               ${g.size ? `<span class="badge badge-off">${esc(g.size)}</span>` : ''}
             </div>
+
             <div class="cta-row">
               ${activeDownloads.length ? `<button class="btn btn-primary" id="open-downloads" type="button">↓ Ir a descargas</button>` : ''}
               ${trailerEmbedUrl ? `<button class="btn" id="open-trailer" type="button">▶ Ver tráiler</button>` : ''}
@@ -151,8 +269,8 @@
           <div class="block" id="requisitos">
             <h2>Requisitos del sistema</h2>
             <div class="req-toggle">
-              <button class="active" data-req="min">Mínimos</button>
-              <button data-req="rec">Recomendados</button>
+              <button class="active" data-req="min" type="button">Mínimos</button>
+              <button data-req="rec" type="button">Recomendados</button>
             </div>
             <div class="req-set active" data-set="min">${esc(g.reqMin) || 'No especificados.'}</div>
             <div class="req-set" data-set="rec">${esc(g.reqRec) || 'No especificados.'}</div>
@@ -184,6 +302,7 @@
         </div>
 
         <aside>
+          ${(g.version || g.category || g.languages || g.updated || g.dlc) ? `
           <div class="panel side-panel">
             <h3>Ficha técnica</h3>
             ${g.version ? `<div class="kv"><span>Versión</span><span>${esc(g.version)}</span></div>` : ''}
@@ -191,7 +310,7 @@
             ${g.languages ? `<div class="kv"><span>Idiomas</span><span>${esc(g.languages)}</span></div>` : ''}
             ${g.updated ? `<div class="kv"><span>Actualizado</span><span>${esc(g.updated)}</span></div>` : ''}
             ${g.dlc ? `<div class="kv"><span>Contenido adicional</span><span>${esc(g.dlc)}</span></div>` : ''}
-          </div>
+          </div>` : ''}
 
           ${(g.category || tags.length) ? `
           <div class="panel side-panel">
@@ -237,64 +356,47 @@
           </div>
           <div class="modal-body">
             <div class="video-wrap">
-              <iframe title="Tráiler de ${esc(g.name)}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+              <iframe
+                title="Tráiler de ${esc(g.name)}"
+                allow="autoplay; encrypted-media; picture-in-picture"
+                allowfullscreen>
+              </iframe>
             </div>
           </div>
         </div>
       </div>` : ''}
     `;
 
-    document.querySelectorAll('.req-toggle button').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        document.querySelectorAll('.req-toggle button').forEach(b=>b.classList.remove('active'));
-        document.querySelectorAll('.req-set').forEach(s=>s.classList.remove('active'));
-        btn.classList.add('active');
-        document.querySelector('.req-set[data-set="'+btn.dataset.req+'"]').classList.add('active');
-      });
-    });
-
-    document.getElementById('open-downloads')?.addEventListener('click', ()=>{
-      openModal('downloads-modal');
-    });
-
-    document.getElementById('open-trailer')?.addEventListener('click', ()=>{
-      const modal = document.getElementById('trailer-modal');
-      const iframe = modal?.querySelector('iframe');
-      if(modal && iframe){
-        iframe.src = modal.dataset.trailerSrc || '';
-        openModal('trailer-modal');
-      }
-    });
-
-    document.querySelectorAll('[data-close-modal]').forEach(el=>{
-      el.addEventListener('click', ()=> closeModal(el.closest('.modal')));
-    });
-
-    document.addEventListener('keydown', event=>{
-      if(event.key === 'Escape'){
-        document.querySelectorAll('.modal.open').forEach(closeModal);
-      }
-    });
+    bindInteractions();
   }
 
-  // ------------------------------------------------------------------
-  // Punto de entrada: lee el slug de la URL (?slug=xxx) y busca el
-  // producto en Supabase. Si el producto está en borrador, la política
-  // RLS de "products" ya se encarga de que un visitante anónimo no lo vea
-  // (a51_getProductBySlug devuelve null como si no existiera).
-  // ------------------------------------------------------------------
+  document.addEventListener('keydown', event=>{
+    if(event.key === 'Escape'){
+      document.querySelectorAll('.modal.open').forEach(closeModal);
+    }
+  });
+
   (async () => {
-    const slug = new URLSearchParams(location.search).get('slug');
-    if(!slug){
-      renderEmpty('No se especificó ningún producto');
-      return;
+    try{
+      const slug = new URLSearchParams(location.search).get('slug');
+
+      if(!slug){
+        renderEmpty('No se especificó ningún producto');
+        return;
+      }
+
+      const product = await a51_getProductBySlug(slug);
+
+      if(!product){
+        renderEmpty(`No se encontró "${slug}" en el catálogo`);
+        return;
+      }
+
+      await renderGame(product);
+    }catch(error){
+      console.error('Error al cargar la ficha pública:', error);
+      renderEmpty('No se pudo cargar el producto');
     }
-    const product = await a51_getProductBySlug(slug);
-    if(!product){
-      renderEmpty(`No se encontró "${slug}" en el catálogo`);
-      return;
-    }
-    renderGame(product);
   })();
 </script>
 </body>
