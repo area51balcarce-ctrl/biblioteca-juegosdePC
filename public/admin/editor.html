@@ -952,6 +952,7 @@
     fields.forEach(f => { if(f !== 'slug') input[f] = document.getElementById(f).value; });
 
     input.coverFile = document.getElementById('cover').files[0] || autoCoverFile || null;
+    input.coverRemoteUrl = autoCoverUrl || null;
     input.mainFile = document.getElementById('mainFile').files[0] || null;
     input.otherFile = document.getElementById('otherFile').files[0] || null;
     input.downloads = collectDownloads();
