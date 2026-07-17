@@ -250,6 +250,43 @@ function a51_safeFileName(name){
   return name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
 }
 
+
+function a51_coverMimeFromName(name=''){
+  const clean = String(name).toLowerCase().split('?')[0];
+  if(clean.endsWith('.png')) return 'image/png';
+  if(clean.endsWith('.webp')) return 'image/webp';
+  return 'image/jpeg';
+}
+
+async function a51_prepareRemoteCover(remoteUrl, productName){
+  const url = String(remoteUrl || '').trim();
+  if(!url) return null;
+
+  const response = await fetch(`/api/image-proxy?url=${encodeURIComponent(url)}`, {
+    headers:{ 'Accept':'image/avif,image/webp,image/png,image/jpeg,image/*' }
+  });
+  if(!response.ok) throw new Error(`No se pudo descargar la portada automática (${response.status}).`);
+
+  const blob = await response.blob();
+  if(!blob.size) throw new Error('La portada automática llegó vacía.');
+
+  const responseType = String(blob.type || '').toLowerCase();
+  const mime = responseType.startsWith('image/')
+    ? responseType
+    : a51_coverMimeFromName(url);
+
+  const extension =
+    mime.includes('png') ? 'png' :
+    mime.includes('webp') ? 'webp' :
+    'jpg';
+
+  return new File(
+    [blob],
+    `${a51_slugify(productName || 'portada')}.${extension}`,
+    { type:mime }
+  );
+}
+
 async function a51_uploadFile(bucket, productId, file){
   const path = `${productId}/${Date.now()}-${a51_safeFileName(file.name)}`;
   const { error } = await A51_CLIENT.storage.from(bucket).upload(path, file, { upsert:false });
@@ -282,7 +319,11 @@ async function a51_syncProductFiles(productId, input){
     if(!file) continue;
     if(slot.bucket === 'covers'){
       const allowed = ['image/jpeg','image/png','image/webp'];
-      if(!allowed.includes(file.type)) return { ok:false, error:new Error('La portada debe ser JPG, PNG o WEBP.') };
+      if(!allowed.includes(file.type)){
+        const inferredType = a51_coverMimeFromName(file.name);
+        file = new File([file], file.name, { type:inferredType });
+        input[slot.file] = file;
+      }
       if(file.size > 5 * 1024 * 1024) return { ok:false, error:new Error('La portada supera 5 MB.') };
     } else if(file.size > 250 * 1024 * 1024){
       return { ok:false, error:new Error('El archivo supera 250 MB.') };
@@ -376,6 +417,14 @@ async function a51_upsertProduct(input){
       ({ data:saved, error } = await A51_CLIENT.from('products').insert(row).select('id, slug').single());
     }
     if(error) return { ok:false, error };
+
+    if(!input.coverFile && input.coverRemoteUrl){
+      try{
+        input.coverFile = await a51_prepareRemoteCover(input.coverRemoteUrl, input.name);
+      }catch(error){
+        return { ok:false, error, stage:'preparación de portada automática' };
+      }
+    }
 
     const filesResult = await a51_syncProductFiles(saved.id, input);
     if(!filesResult.ok) return { ...filesResult, stage:'archivos' };
