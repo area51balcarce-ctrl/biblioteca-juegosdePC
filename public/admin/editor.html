@@ -602,7 +602,9 @@
 
     if(!result.ok){
       console.error(result.error);
-      showError('No se pudo guardar el producto. Revisá los datos e intentá de nuevo.');
+      const detail = result.error?.message || result.error?.details || 'Error desconocido';
+      const stage = result.stage ? ` durante ${result.stage}` : '';
+      showError(`El producto pudo guardarse parcialmente, pero falló${stage}: ${detail}`);
       submitBtn.disabled = false;
       submitBtn.textContent = '💾 Guardar producto';
       return;
