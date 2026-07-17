@@ -151,7 +151,7 @@ async function a51_getOrCreateTagIds(namesCsv){
    --------------------------------------------------------- */
 
 const A51_PRODUCT_SELECT = `
-  id, slug, name, description, req_min, req_rec, size, version, languages,
+  id, slug, name, description, req_min, req_rec, size, version, languages, trailer_url,
   install, notes, changelog, dlc, legal_basis, status,
   cover_path, cover_name,
   file_main_path, file_main_name,
@@ -180,6 +180,7 @@ function a51_mapProductRow(row){
     size: row.size || '',
     version: row.version || '',
     languages: row.languages || '',
+    trailerUrl: row.trailer_url || '',
     install: row.install || '',
     notes: row.notes || '',
     changelog: row.changelog || '',
@@ -305,7 +306,7 @@ async function a51_upsertProduct(input){
     const row = {
       slug: a51_slugify(input.slug), name: input.name.trim(), description: input.description || null,
       req_min: input.reqMin || null, req_rec: input.reqRec || null, size: input.size || null,
-      version: input.version || null, languages: input.languages || null, install: input.install || null,
+      version: input.version || null, languages: input.languages || null, trailer_url: input.trailerUrl || null, install: input.install || null,
       notes: input.notes || null, changelog: input.changelog || null, dlc: input.dlc || null,
       legal_basis: input.legalBasis, status: input.status, category_id: categoryId,
     };
