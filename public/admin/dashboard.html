@@ -56,6 +56,31 @@
   .icon-btn:hover{ color:var(--text); }
   .table-msg{ text-align:center; padding:40px; color:var(--text-faint); font-family:var(--f-mono); font-size:12px; }
   .table-msg.error{ color:#ff8080; }
+  .download-summary{ min-width:165px; display:grid; gap:6px; }
+  .health-counts{ display:flex; flex-wrap:wrap; gap:6px; font-family:var(--f-mono); font-size:10px; }
+  .health-pill{ padding:4px 7px; border:1px solid var(--line-bright); white-space:nowrap; }
+  .health-pill.ok{ color:var(--accent); border-color:rgba(50,255,151,.4); }
+  .health-pill.review{ color:#ffc76b; border-color:rgba(255,199,107,.4); }
+  .health-pill.down{ color:#ff8080; border-color:rgba(255,128,128,.4); }
+  .health-pill.off{ color:var(--text-faint); }
+  .health-actions{ display:flex; gap:6px; flex-wrap:wrap; }
+  .health-btn{ font-family:var(--f-mono); font-size:10px; padding:6px 8px; border:1px solid var(--line-bright); background:transparent; color:var(--text-dim); cursor:pointer; }
+  .health-btn:hover{ border-color:var(--accent); color:var(--accent); }
+  .health-btn:disabled{ opacity:.55; cursor:wait; }
+  .download-panel{ display:none; padding:0 12px 14px; }
+  .download-panel.open{ display:table-row; }
+  .download-panel td{ background:var(--bg-panel-2); }
+  .download-list{ display:grid; gap:8px; padding:12px 0; }
+  .download-item{ display:grid; grid-template-columns:110px minmax(220px,1fr) 100px 150px; gap:10px; align-items:center; padding:9px 10px; border:1px solid var(--line); background:var(--bg-elev); }
+  .download-type{ font-family:var(--f-mono); color:var(--text); }
+  .download-url{ font-family:var(--f-mono); font-size:10px; color:var(--text-faint); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .download-health{ font-family:var(--f-mono); font-size:10px; font-weight:700; }
+  .download-health.active{ color:var(--accent); }
+  .download-health.review{ color:#ffc76b; }
+  .download-health.down{ color:#ff8080; }
+  .download-health.unchecked{ color:var(--text-faint); }
+  .checked-at{ font-family:var(--f-mono); font-size:9px; color:var(--text-faint); }
+  @media(max-width:980px){ .download-item{ grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
@@ -115,12 +140,13 @@
             <th>Versión</th>
             <th>Estado</th>
             <th>Actualizado</th>
+            <th>Descargas</th>
             <th>Integración</th>
             <th></th>
           </tr>
         </thead>
         <tbody id="table-body">
-          <tr><td colspan="7" class="table-msg">Cargando catálogo…</td></tr>
+          <tr><td colspan="8" class="table-msg">Cargando catálogo…</td></tr>
         </tbody>
       </table>
     </div>
@@ -150,10 +176,33 @@
     document.getElementById('stat-total').textContent = list.length;
   }
 
+  function healthLabel(status){
+    return {
+      active:'🟢 Activo',
+      review:'🟡 Revisar',
+      down:'🔴 Caído',
+      unchecked:'⚪ Sin revisar'
+    }[status] || '⚪ Sin revisar';
+  }
+
+  function downloadSummary(downloads=[]){
+    const enabled = downloads.filter(d => d.status !== 'disabled');
+    const counts = { active:0, review:0, down:0, unchecked:0, disabled:downloads.length-enabled.length };
+    enabled.forEach(d => counts[d.healthStatus || 'unchecked'] = (counts[d.healthStatus || 'unchecked'] || 0) + 1);
+    if(!downloads.length) return '<div class="health-pill off">Sin enlaces</div>';
+    return `<div class="health-counts">
+      ${counts.active ? `<span class="health-pill ok">${counts.active} activos</span>` : ''}
+      ${counts.review ? `<span class="health-pill review">${counts.review} revisar</span>` : ''}
+      ${counts.down ? `<span class="health-pill down">${counts.down} caídos</span>` : ''}
+      ${counts.unchecked ? `<span class="health-pill off">${counts.unchecked} sin revisar</span>` : ''}
+      ${counts.disabled ? `<span class="health-pill off">${counts.disabled} desactivados</span>` : ''}
+    </div>`;
+  }
+
   function render(list){
     const body = document.getElementById('table-body');
     if(list.length === 0){
-      body.innerHTML = '<tr><td colspan="7" class="table-msg">Catálogo vacío — usá "+ Nuevo producto" para cargar el primero.</td></tr>';
+      body.innerHTML = '<tr><td colspan="8" class="table-msg">Catálogo vacío — usá "+ Nuevo producto" para cargar el primero.</td></tr>';
       return;
     }
     body.innerHTML = list.map(g => {
@@ -161,8 +210,69 @@
       const slug = encodeURIComponent(g.slug || '');
       const apiUrl = `${SITE_ORIGIN}/api/productos/${encodeURIComponent(g.id)}`;
       const integrationCode = `fetch('${apiUrl}').then(r=>r.json()).then(({producto})=>{ console.log(producto); });`;
-      return `<tr><td><div class="game-cell"><div class="game-thumb" ${coverStyle}></div><div><div class="game-name">${esc(g.name || '(sin nombre)')}</div><div class="game-slug">/producto/${esc(g.slug)}</div><div class="uuid-short">ID: ${esc(g.id)}</div></div></div></td><td>${esc(g.category || '—')}</td><td class="mono">${esc(g.version || '—')}</td><td>${badge(g.status)}</td><td class="mono">${esc(g.updated || '—')}</td><td><div class="api-actions"><button class="copy-btn" data-copy="${esc(g.id)}" onclick="copyValue(this,'ID copiado ✓')">Copiar ID</button><button class="copy-btn" data-copy="${esc(BASE_URL + slug)}" onclick="copyValue(this,'Enlace copiado ✓')">Copiar enlace</button><button class="copy-btn" data-copy="${esc(integrationCode)}" onclick="copyValue(this,'Código copiado ✓')">Copiar integración</button></div></td><td><div class="row-actions"><a class="icon-btn" title="Editar" href="/admin/editor?slug=${slug}">✎</a><button class="icon-btn" type="button" title="Eliminar" data-slug="${esc(g.slug)}" onclick="removeProduct(this.dataset.slug)">🗑</button></div></td></tr>`;
+      const downloads = g.downloads || [];
+      const detailRows = downloads.length
+        ? downloads.map(d => `<div class="download-item">
+            <div class="download-type">${esc(d.type)}</div>
+            <div class="download-url" title="${esc(d.url)}">${esc(d.url)}</div>
+            <div class="download-health ${esc(d.healthStatus || 'unchecked')}">${healthLabel(d.healthStatus)}</div>
+            <div class="checked-at">${d.checkedAt ? `Revisado: ${esc(new Date(d.checkedAt).toLocaleString('es-AR'))}` : 'Nunca revisado'}</div>
+          </div>`).join('')
+        : '<div class="table-msg">Este producto todavía no tiene enlaces de descarga.</div>';
+
+      return `<tr>
+        <td><div class="game-cell"><div class="game-thumb" ${coverStyle}></div><div><div class="game-name">${esc(g.name || '(sin nombre)')}</div><div class="game-slug">/producto/${esc(g.slug)}</div><div class="uuid-short">ID: ${esc(g.id)}</div></div></div></td>
+        <td>${esc(g.category || '—')}</td>
+        <td class="mono">${esc(g.version || '—')}</td>
+        <td>${badge(g.status)}</td>
+        <td class="mono">${esc(g.updated || '—')}</td>
+        <td><div class="download-summary">${downloadSummary(downloads)}<div class="health-actions"><button class="health-btn" type="button" onclick="toggleDownloads('${esc(g.id)}')">Ver enlaces</button><button class="health-btn" type="button" onclick="verifyDownloads(this,'${esc(g.id)}')" ${downloads.length ? '' : 'disabled'}>Verificar</button></div></div></td>
+        <td><div class="api-actions"><button class="copy-btn" data-copy="${esc(g.id)}" onclick="copyValue(this,'ID copiado ✓')">Copiar ID</button><button class="copy-btn" data-copy="${esc(BASE_URL + slug)}" onclick="copyValue(this,'Enlace copiado ✓')">Copiar enlace</button><button class="copy-btn" data-copy="${esc(integrationCode)}" onclick="copyValue(this,'Código copiado ✓')">Copiar integración</button></div></td>
+        <td><div class="row-actions"><a class="icon-btn" title="Editar" href="/admin/editor?slug=${slug}">✎</a><button class="icon-btn" type="button" title="Eliminar" data-slug="${esc(g.slug)}" onclick="removeProduct(this.dataset.slug)">🗑</button></div></td>
+      </tr>
+      <tr id="downloads-${esc(g.id)}" class="download-panel"><td colspan="8"><div class="download-list">${detailRows}</div></td></tr>`;
     }).join('');
+  }
+
+  function toggleDownloads(productId){
+    document.getElementById(`downloads-${productId}`)?.classList.toggle('open');
+  }
+
+  async function verifyDownloads(button, productId){
+    const product = ALL_PRODUCTS.find(item => item.id === productId);
+    const downloads = (product?.downloads || []).filter(item => item.status !== 'disabled');
+    if(!downloads.length) return;
+
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Verificando…';
+
+    try{
+      for(const download of downloads){
+        let healthStatus = 'review';
+        try{
+          const response = await fetch(`/api/check-download-link?url=${encodeURIComponent(download.url)}`);
+          const result = await response.json();
+          healthStatus = result.healthStatus || 'review';
+        }catch(error){
+          healthStatus = 'review';
+        }
+
+        const { error } = await A51_CLIENT
+          .from('product_downloads')
+          .update({
+            health_status: healthStatus,
+            checked_at: new Date().toISOString()
+          })
+          .eq('id', download.id);
+
+        if(error) console.error(error);
+      }
+      await loadProducts();
+    }finally{
+      button.disabled = false;
+      button.textContent = original;
+    }
   }
 
   function copyValue(btn, successText){
@@ -210,13 +320,13 @@
 
   async function loadProducts(){
     const body = document.getElementById('table-body');
-    body.innerHTML = '<tr><td colspan="7" class="table-msg">Cargando catálogo…</td></tr>';
+    body.innerHTML = '<tr><td colspan="8" class="table-msg">Cargando catálogo…</td></tr>';
     try{
       ALL_PRODUCTS = await a51_getProducts();
       applyFilters();
     }catch(err){
       console.error(err);
-      body.innerHTML = '<tr><td colspan="7" class="table-msg error">No se pudo cargar el catálogo. Recargá la página.</td></tr>';
+      body.innerHTML = '<tr><td colspan="8" class="table-msg error">No se pudo cargar el catálogo. Recargá la página.</td></tr>';
     }
   }
 
