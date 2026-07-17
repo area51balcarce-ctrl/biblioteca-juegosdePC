@@ -1,4 +1,5 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "echo Sin dependencias para instalar",
   "buildCommand": "npm run build",
@@ -21,6 +22,17 @@
     {
       "source": "/producto",
       "destination": "/producto/index.html"
+    }
+  ],
+  "functions": {
+    "api/cron/verify-downloads.js": {
+      "maxDuration": 60
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/verify-downloads",
+      "schedule": "0 3 * * *"
     }
   ],
   "headers": [
