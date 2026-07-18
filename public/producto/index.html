@@ -213,6 +213,22 @@
     const activeDownloads = (g.downloads || []).filter(item =>
       item && item.url && item.status !== 'disabled'
     );
+
+    // El archivo cargado en "Torrent u otro archivo pequeño" queda en files.other.
+    // Generamos una URL temporal y lo agregamos al mismo modal de descargas.
+    if(g.files?.other?.path){
+      const auxiliaryUrl = await a51_getSignedDownloadUrl(g.files.other.path);
+      if(auxiliaryUrl){
+        const fileName = g.files.other.name || 'Archivo torrent';
+        activeDownloads.push({
+          type: fileName.toLowerCase().endsWith('.torrent') ? 'Torrent' : 'Otro archivo',
+          url: auxiliaryUrl,
+          status: 'active',
+          healthStatus: 'unchecked'
+        });
+      }
+    }
+
     const installText = publicInstallText(g.install);
 
     const coverSrc = g.cover ? g.cover.url
