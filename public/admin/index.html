@@ -39,7 +39,7 @@
   <div class="panel login-card bracket-frame">
     <div class="login-head">
       <div class="a51-brand"><span class="dot"></span> ÁREA&nbsp;51</div>
-      <p>Panel de administración <span class="cursor-line"></span></p>
+      <p>Acceso al sistema <span class="cursor-line"></span></p>
     </div>
     <div class="form-error" id="form-error"></div>
     <form id="login-form">
@@ -55,7 +55,7 @@
     </form>
     <div class="status-line" id="status-line">CONEXIÓN CIFRADA · SUPABASE AUTH</div>
   </div>
-  <div class="footnote">Acceso restringido — solo administradores autorizados</div>
+  <div class="footnote">Acceso restringido — usuarios autorizados</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -104,7 +104,7 @@
     const admin = await a51_getCurrentAdmin();
     if(!admin){
       await a51_signOut();
-      showError('Esta cuenta no tiene permisos de administrador.');
+      showError('Esta cuenta no tiene permisos para acceder al sistema.');
       submitBtn.disabled=false; submitBtn.textContent='Ingresar al panel →';
       statusLine.textContent='ACCESO DENEGADO';
       return;
