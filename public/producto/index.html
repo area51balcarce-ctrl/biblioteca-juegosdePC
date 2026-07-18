@@ -63,6 +63,14 @@
   .dl-item .btn{ padding:8px 14px; font-size:11px; flex:none; }
   .dl-empty{ font-family:var(--f-mono); font-size:12px; color:var(--text-faint); padding:8px 0; }
 
+  .torrent-client{ margin-top:18px; padding-top:18px; border-top:1px solid var(--line); }
+  .torrent-client h3{ margin:0 0 8px; font-family:var(--f-mono); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--text); }
+  .torrent-client p{ margin:0 0 14px; color:var(--text-dim); font-size:13.5px; line-height:1.55; }
+  .torrent-client .client-card{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding:13px 14px; border:1px solid var(--line-bright); background:var(--bg-panel-2); }
+  .torrent-client .client-copy b{ display:block; font-size:13.5px; }
+  .torrent-client .client-copy small{ display:block; margin-top:3px; font-family:var(--f-mono); font-size:10.5px; color:var(--text-faint); }
+  @media(max-width:560px){ .torrent-client .client-card{ align-items:stretch; flex-direction:column; } .torrent-client .client-card .btn{ width:100%; text-align:center; } }
+
   .modal{ position:fixed; inset:0; z-index:1000; display:none; align-items:center; justify-content:center; padding:20px; }
   .modal.open{ display:flex; }
   .modal-backdrop{ position:absolute; inset:0; background:rgba(0,0,0,.78); backdrop-filter:blur(4px); }
@@ -238,6 +246,12 @@
       });
     }
 
+    const hasTorrentDownload = activeDownloads.some(item => {
+      const type = String(item?.type || '').toLowerCase();
+      const url = String(item?.url || '').toLowerCase();
+      return type.includes('torrent') || type.includes('magnet') || url.startsWith('magnet:');
+    });
+
     const installText = publicInstallText(g.install);
 
     const coverSrc = g.cover ? g.cover.url
@@ -350,6 +364,19 @@
                 </div>
               `).join('') : '<div class="dl-empty">No hay enlaces disponibles.</div>'}
             </div>
+
+            ${hasTorrentDownload ? `
+            <div class="torrent-client">
+              <h3>¿No tenés un cliente BitTorrent?</h3>
+              <p>Para abrir archivos <strong>.torrent</strong> necesitás un cliente compatible. Recomendamos qBittorrent porque es gratuito, sin publicidad y de código abierto.</p>
+              <div class="client-card">
+                <div class="client-copy">
+                  <b>🟢 qBittorrent</b>
+                  <small>Sitio oficial · Windows, macOS y Linux</small>
+                </div>
+                <a class="btn btn-primary" href="https://www.qbittorrent.org/download" target="_blank" rel="noopener noreferrer">⬇ Descargar qBittorrent</a>
+              </div>
+            </div>` : ''}
           </div>
         </div>
       </div>
