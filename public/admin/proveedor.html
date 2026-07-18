@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Proveedor — ÁREA 51</title>
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  body{ min-height:100vh; }
+  .provider-shell{ max-width:1050px; margin:0 auto; padding:28px 20px 60px; }
+  .provider-head{
+    display:flex; justify-content:space-between; align-items:center;
+    gap:18px; margin-bottom:28px; flex-wrap:wrap;
+  }
+  .provider-title .eyebrow{ margin-bottom:7px; }
+  .provider-title h1{ font-size:25px; }
+  .session-box{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    font-family:var(--f-mono); font-size:10.5px; color:var(--text-faint);
+  }
+  .logout-btn{
+    background:transparent; border:1px solid var(--line-bright);
+    color:var(--text-dim); font-family:var(--f-mono); font-size:11px;
+    padding:8px 11px; cursor:pointer;
+  }
+  .logout-btn:hover{ border-color:var(--accent); color:var(--accent); }
+  .search-panel{ padding:18px; margin-bottom:18px; }
+  .search-box{ position:relative; }
+  .search-box::before{
+    content:">"; position:absolute; left:15px; top:50%;
+    transform:translateY(-50%); color:var(--accent);
+    font-family:var(--f-mono);
+  }
+  .search-box input{
+    width:100%; background:var(--bg-elev); border:1px solid var(--line-bright);
+    color:var(--text); padding:14px 14px 14px 34px;
+    font-family:var(--f-mono); font-size:14px; border-radius:2px; outline:none;
+  }
+  .search-box input:focus{ border-color:var(--accent); }
+  .results{ display:grid; gap:11px; }
+  .game-card{
+    display:grid; grid-template-columns:58px minmax(0,1fr) auto;
+    gap:14px; align-items:center; padding:13px 15px;
+  }
+  .game-cover{
+    width:58px; height:58px; border:1px solid var(--line);
+    background:var(--bg-elev); background-size:cover; background-position:center;
+  }
+  .game-name{ font-weight:700; font-size:15px; }
+  .game-path{
+    margin-top:4px; font-family:var(--f-mono); font-size:10.5px;
+    color:var(--text-faint); overflow:hidden; text-overflow:ellipsis;
+  }
+  .copy-link{
+    min-width:150px; font-family:var(--f-mono); font-size:11px;
+    letter-spacing:.09em; text-transform:uppercase; padding:10px 14px;
+    border:1px solid var(--line-bright); background:transparent;
+    color:var(--text-dim); cursor:pointer;
+  }
+  .copy-link:hover{ border-color:var(--accent); color:var(--accent); }
+  .copy-link.copied{
+    border-color:var(--accent); color:var(--accent);
+    background:var(--accent-soft);
+  }
+  .message{
+    text-align:center; padding:42px 18px; color:var(--text-faint);
+    font-family:var(--f-mono); font-size:12px;
+  }
+  .message.error{ color:#ff8080; }
+  @media(max-width:640px){
+    .provider-shell{ padding:20px 14px 45px; }
+    .provider-head{ align-items:flex-start; }
+    .session-box{ width:100%; justify-content:space-between; }
+    .game-card{ grid-template-columns:48px minmax(0,1fr); }
+    .game-cover{ width:48px; height:48px; }
+    .copy-link{ grid-column:1 / -1; width:100%; }
+  }
+</style>
+</head>
+<body>
+<div class="a51-scanbg"></div>
+<main class="provider-shell">
+  <header class="provider-head">
+    <div class="provider-title">
+      <div class="a51-brand"><span class="dot"></span> ÁREA&nbsp;51</div>
+      <div class="eyebrow" style="margin-top:18px;">Acceso de proveedor</div>
+      <h1>Buscador de juegos</h1>
+    </div>
+    <div class="session-box">
+      <span id="session-info">Cargando sesión…</span>
+      <button class="logout-btn" id="logout-btn" type="button">Cerrar sesión</button>
+    </div>
+  </header>
+
+  <section class="panel search-panel">
+    <div class="search-box">
+      <input id="search" type="search" placeholder="Buscar juego por nombre…" autocomplete="off">
+    </div>
+  </section>
+
+  <section class="results" id="results">
+    <div class="panel message">Cargando catálogo…</div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../assets/config.js"></script>
+<script src="../assets/store.js"></script>
+<script>
+  const BASE_URL = new URL('../producto/index.html', location.href).href + '?slug=';
+  let PRODUCTS = [];
+
+  function esc(value){
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+    }[char]));
+  }
+
+  function render(){
+    const query = document.getElementById('search').value.trim().toLowerCase();
+    const results = document.getElementById('results');
+    const filtered = PRODUCTS.filter(product =>
+      product.status === 'ok' &&
+      (!query ||
+        (product.name || '').toLowerCase().includes(query) ||
+        (product.slug || '').toLowerCase().includes(query))
+    );
+
+    if(!filtered.length){
+      results.innerHTML = '<div class="panel message">No se encontraron juegos publicados.</div>';
+      return;
+    }
+
+    results.innerHTML = filtered.map(product => {
+      const publicUrl = BASE_URL + encodeURIComponent(product.slug || '');
+      const coverStyle = product.cover?.url
+        ? `style="background-image:url('${encodeURI(product.cover.url)}')"`
+        : '';
+
+      return `<article class="panel game-card">
+        <div class="game-cover" ${coverStyle}></div>
+        <div>
+          <div class="game-name">${esc(product.name || '(sin nombre)')}</div>
+          <div class="game-path">/producto/${esc(product.slug || '')}</div>
+        </div>
+        <button class="copy-link" type="button"
+          data-copy="${esc(publicUrl)}"
+          onclick="copyLink(this)">Copiar enlace</button>
+      </article>`;
+    }).join('');
+  }
+
+  async function copyLink(button){
+    const value = button.getAttribute('data-copy') || '';
+    const original = button.textContent;
+    try{
+      await navigator.clipboard.writeText(value);
+    }catch{
+      const temp = document.createElement('textarea');
+      temp.value = value;
+      temp.style.position = 'fixed';
+      temp.style.opacity = '0';
+      document.body.appendChild(temp);
+      temp.select();
+      document.execCommand('copy');
+      temp.remove();
+    }
+
+    button.textContent = 'Enlace copiado ✓';
+    button.classList.add('copied');
+    setTimeout(() => {
+      button.textContent = original;
+      button.classList.remove('copied');
+    }, 1600);
+  }
+
+  document.getElementById('search').addEventListener('input', render);
+
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    await a51_signOut();
+    window.location.assign('/admin/');
+  });
+
+  (async () => {
+    const session = await a51_requireSession();
+    if(!session) return;
+
+    const user = await a51_getCurrentAdmin();
+    if(!user) return;
+
+    if(user.role !== 'operator'){
+      window.location.assign('/admin/dashboard');
+      return;
+    }
+
+    document.getElementById('session-info').textContent =
+      `SESIÓN: ${user.email} · rol: proveedor`;
+
+    try{
+      PRODUCTS = await a51_getProducts();
+      render();
+    }catch(error){
+      console.error(error);
+      document.getElementById('results').innerHTML =
+        '<div class="panel message error">No se pudo cargar el catálogo.</div>';
+    }
+  })();
+</script>
+</body>
+</html>
