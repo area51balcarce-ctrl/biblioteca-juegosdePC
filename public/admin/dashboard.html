@@ -105,6 +105,21 @@
   .download-health.unchecked{ color:var(--text-faint); }
   .checked-at{ font-family:var(--f-mono); font-size:9px; color:var(--text-faint); }
   @media(max-width:980px){ .download-item{ grid-template-columns:1fr; } }
+
+  body.operator-mode .sidebar .nav-item:not(.active),
+  body.operator-mode #verify-all-btn,
+  body.operator-mode .btn-new-product,
+  body.operator-mode .verify-progress,
+  body.operator-mode .stat-row,
+  body.operator-mode #filter-cat,
+  body.operator-mode #filter-status,
+  body.operator-mode #filter-availability{display:none!important;}
+  .operator-note{display:none;}
+  body.operator-mode .operator-note{display:block;font-family:var(--f-mono);font-size:11px;color:var(--text-faint);margin-top:7px;}
+  body.operator-mode table thead th:nth-child(n+3),body.operator-mode table tbody td:nth-child(n+3){display:none;}
+  body.operator-mode table thead th:nth-child(2),body.operator-mode table tbody td:nth-child(2){text-align:right;}
+  body.operator-mode .operator-copy-wrap{display:flex;justify-content:flex-end;}
+  @media(max-width:760px){body.operator-mode .layout{grid-template-columns:1fr;}body.operator-mode .sidebar{border-right:0;border-bottom:1px solid var(--line);padding:14px 18px;flex-direction:row;align-items:center;gap:12px;}body.operator-mode .sidebar .a51-brand{margin:0 auto 0 0;}body.operator-mode .sidebar .nav-item{display:none!important;}body.operator-mode .sidebar-foot{margin:0;display:flex;align-items:center;gap:10px;padding:0;}body.operator-mode .sidebar-foot button{margin:0;width:auto;}body.operator-mode .main{padding-top:22px;}}
 </style>
 </head>
 <body>
@@ -126,12 +141,13 @@
   <main class="main">
     <div class="topbar">
       <div>
-        <div class="eyebrow">Panel de administración</div>
-        <h1>Catálogo de productos</h1>
+        <div class="eyebrow" id="panel-eyebrow">Panel de administración</div>
+        <h1 id="panel-title">Catálogo de productos</h1>
+        <div class="operator-note">Buscá un juego y copiá su enlace público.</div>
       </div>
       <div style="display:flex; gap:10px; flex-wrap:wrap;">
         <button class="btn bulk-check-btn" id="verify-all-btn" type="button">⌁ Verificar todo</button>
-        <a class="btn btn-primary" href="/admin/editor">+ Nuevo producto</a>
+        <a class="btn btn-primary btn-new-product" href="/admin/editor">+ Nuevo producto</a>
       </div>
     </div>
 
@@ -203,6 +219,8 @@
   const BASE_URL = new URL('../producto/index.html', location.href).href + '?slug=';
   let ALL_PRODUCTS = [];
   let VERIFYING_ALL = false;
+  let CURRENT_USER = null;
+  let OPERATOR_MODE = false;
 
   function esc(v){ return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -274,6 +292,23 @@
 
   function render(list){
     const body = document.getElementById('table-body');
+
+    if(OPERATOR_MODE){
+      if(list.length === 0){
+        body.innerHTML = '<tr><td colspan="2" class="table-msg">No se encontraron juegos publicados.</td></tr>';
+        return;
+      }
+      body.innerHTML = list.map(g => {
+        const coverStyle = g.cover?.url ? `style="background-image:url('${encodeURI(g.cover.url)}');background-size:cover;background-position:center"` : '';
+        const publicUrl = BASE_URL + encodeURIComponent(g.slug || '');
+        return `<tr>
+          <td><div class="game-cell"><div class="game-thumb" ${coverStyle}></div><div><div class="game-name">${esc(g.name || '(sin nombre)')}</div><div class="game-slug">/producto/${esc(g.slug)}</div></div></div></td>
+          <td><div class="operator-copy-wrap"><button class="copy-btn" data-copy="${esc(publicUrl)}" onclick="copyValue(this,'Enlace copiado ✓')">Copiar enlace</button></div></td>
+        </tr>`;
+      }).join('');
+      return;
+    }
+
     if(list.length === 0){
       body.innerHTML = '<tr><td colspan="8" class="table-msg">Catálogo vacío — usá "+ Nuevo producto" para cargar el primero.</td></tr>';
       return;
@@ -504,7 +539,12 @@
   }
 
   function applyFilters(){
-    const q = document.getElementById('search').value.toLowerCase();
+    const q = document.getElementById('search').value.toLowerCase().trim();
+    if(OPERATOR_MODE){
+      render(ALL_PRODUCTS.filter(g => g.status === 'ok' && (!q || (g.name||'').toLowerCase().includes(q) || (g.slug||'').toLowerCase().includes(q))));
+      return;
+    }
+
     const cat = document.getElementById('filter-cat').value;
     const status = document.getElementById('filter-status').value;
     const availability = document.getElementById('filter-availability').value;
@@ -540,13 +580,13 @@
 
   async function loadProducts(){
     const body = document.getElementById('table-body');
-    body.innerHTML = '<tr><td colspan="8" class="table-msg">Cargando catálogo…</td></tr>';
+    body.innerHTML = `<tr><td colspan="${OPERATOR_MODE ? 2 : 8}" class="table-msg">Cargando catálogo…</td></tr>`;
     try{
       ALL_PRODUCTS = await a51_getProducts();
       applyFilters();
     }catch(err){
       console.error(err);
-      body.innerHTML = '<tr><td colspan="8" class="table-msg error">No se pudo cargar el catálogo. Recargá la página.</td></tr>';
+      body.innerHTML = `<tr><td colspan="${OPERATOR_MODE ? 2 : 8}" class="table-msg error">No se pudo cargar el catálogo. Recargá la página.</td></tr>`;
     }
   }
 
@@ -575,11 +615,21 @@
     const session = await a51_requireSession();
     if(!session) return;
 
-    const admin = await a51_getCurrentAdmin();
-    if(!admin) return;
-    document.getElementById('session-info').textContent = `SESIÓN: ${admin.email} · rol: ${admin.role === 'admin' ? 'administrador' : 'editor'}`;
+    CURRENT_USER = await a51_getCurrentAdmin();
+    if(!CURRENT_USER) return;
+    OPERATOR_MODE = CURRENT_USER.role === 'operator';
+    document.body.classList.toggle('operator-mode', OPERATOR_MODE);
 
-    await populateCategoryFilter();
+    const roleLabel = { admin:'administrador', editor:'editor', operator:'operador' }[CURRENT_USER.role] || CURRENT_USER.role;
+    document.getElementById('session-info').textContent = `SESIÓN: ${CURRENT_USER.email} · rol: ${roleLabel}`;
+
+    if(OPERATOR_MODE){
+      document.getElementById('panel-eyebrow').textContent = 'Acceso de operador';
+      document.getElementById('panel-title').textContent = 'Buscador de juegos';
+      document.querySelector('thead tr').innerHTML = '<th>Producto</th><th>Enlace</th>';
+    }else{
+      await populateCategoryFilter();
+    }
     await loadProducts();
   })();
 </script>
