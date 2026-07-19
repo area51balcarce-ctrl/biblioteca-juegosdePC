@@ -354,8 +354,9 @@
   }
 
   const DOWNLOAD_TYPES = [
-    'Torrent','Mega','MediaFire','Google Drive','1Fichier',
-    'Qiwi','GoFile','Buzzheavier','Pixeldrain','Otro'
+    'MediaFire','Pixeldrain','Google Drive','Mega','1Fichier',
+    'GoFile','Buzzheavier','Qiwi','AkiraBox','Torrent','Magnet',
+    'URL directa','Otro'
   ];
 
   function createDownloadRow(download={}){
@@ -371,14 +372,25 @@
       option.textContent = name;
       type.append(option);
     });
-    type.value = DOWNLOAD_TYPES.includes(download.type) ? download.type : 'Otro';
+    const savedType = String(download.type || '').trim();
+    type.value = DOWNLOAD_TYPES.includes(savedType) ? savedType : 'Otro';
 
     const url = document.createElement('input');
     url.type = 'text';
     url.className = 'download-url';
-    url.placeholder = 'https://... o magnet:?xt=...';
+    url.placeholder = type.value === 'Magnet' ? 'magnet:?xt=urn:btih:...' : 'https://...';
     url.value = download.url || '';
     url.setAttribute('aria-label','Enlace de descarga');
+
+    function syncDownloadPlaceholder(){
+      url.placeholder = type.value === 'Magnet'
+        ? 'magnet:?xt=urn:btih:...'
+        : type.value === 'URL directa'
+          ? 'https://servidor.com/archivo.zip'
+          : 'https://...';
+    }
+    type.addEventListener('change', syncDownloadPlaceholder);
+    syncDownloadPlaceholder();
 
     const status = document.createElement('select');
     status.className = 'download-status';
