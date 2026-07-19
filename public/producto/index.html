@@ -140,12 +140,7 @@
 
   function downloadLabel(type){
     const value = String(type || 'Otro').trim();
-    const key = value.toLowerCase();
-    if(key.includes('mediafire')) return '🟦 MediaFire';
-    if(key.includes('pixeldrain')) return '🟪 Pixeldrain';
-    if(key.includes('akirabox')) return '🟢 AkiraBox';
-    if(key.includes('torrent') || key.includes('magnet')) return '🧲 Torrent';
-    return value;
+    return `${a51_downloadTypeIcon(value)} ${value}`;
   }
 
   function publicInstallText(value){
@@ -252,6 +247,11 @@
       return type.includes('torrent') || type.includes('magnet') || url.startsWith('magnet:');
     });
 
+    const preparedDownloads = activeDownloads.map(item => ({
+      ...item,
+      prepared: a51_prepareDownloadLink(item)
+    })).filter(item => item.prepared.url);
+
     const installText = publicInstallText(g.install);
 
     const coverSrc = g.cover ? g.cover.url
@@ -280,7 +280,7 @@
             </div>
 
             <div class="cta-row">
-              ${activeDownloads.length ? `<button class="btn btn-primary" id="open-downloads" type="button">↓ Ir a descargas</button>` : ''}
+              ${preparedDownloads.length ? `<button class="btn btn-primary" id="open-downloads" type="button">↓ Ir a descargas</button>` : ''}
             </div>
           </div>
         </div>
@@ -354,13 +354,15 @@
           </div>
           <div class="modal-body">
             <div class="download-list">
-              ${activeDownloads.length ? activeDownloads.map(item => `
+              ${preparedDownloads.length ? preparedDownloads.map(item => `
                 <div class="dl-item">
                   <div class="lbl">
-                    <b>${esc(downloadLabel(item.type))}</b>
-                    <small>${item.healthStatus === 'down' ? 'Enlace caído' : item.healthStatus === 'review' ? 'Revisión manual' : 'Enlace directo'}</small>
+                    <b>${esc(downloadLabel(item.prepared.type || item.type))}</b>
+                    <small>${item.healthStatus === 'down' ? 'Enlace caído' : item.healthStatus === 'review' ? 'Revisión manual' : item.prepared.direct ? 'Descarga directa' : 'Abrir servidor'}</small>
                   </div>
-                  <a class="btn" href="${esc(item.url)}" target="_blank" rel="noopener noreferrer">Descargar</a>
+                  <a class="btn" href="${esc(item.prepared.url)}"
+                    ${item.prepared.action === 'download' ? 'download' : ''}
+                    ${item.prepared.action === 'open' && item.prepared.type !== 'Magnet' ? 'target="_blank" rel="noopener noreferrer"' : ''}>${item.prepared.type === 'Magnet' ? 'Abrir' : 'Descargar'}</a>
                 </div>
               `).join('') : '<div class="dl-empty">No hay enlaces disponibles.</div>'}
             </div>
