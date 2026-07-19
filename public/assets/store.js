@@ -367,6 +367,55 @@ function a51_isValidDownloadUrl(value){
   }
 }
 
+// Normaliza el destino público según el proveedor elegido en el editor.
+// MediaFire y otros hosts conservan su página pública porque sus enlaces
+// directos suelen ser temporales. Pixeldrain permite una URL API estable.
+function a51_prepareDownloadLink(download){
+  const type = String(download?.type || 'Otro').trim();
+  const rawUrl = String(download?.url || '').trim();
+  const key = type.toLowerCase();
+
+  if(!rawUrl) return { url:'', action:'download', direct:false, type };
+
+  if(key === 'magnet' || rawUrl.toLowerCase().startsWith('magnet:?')){
+    return { url:rawUrl, action:'open', direct:true, type:'Magnet' };
+  }
+
+  if(key.includes('pixeldrain')){
+    try{
+      const parsed = new URL(rawUrl);
+      let fileId = '';
+      const parts = parsed.pathname.split('/').filter(Boolean);
+      if(parsed.hostname.endsWith('pixeldrain.com')){
+        if(parts[0] === 'u' || parts[0] === 'l') fileId = parts[1] || '';
+        if(parts[0] === 'api' && parts[1] === 'file') fileId = parts[2] || '';
+      }
+      if(fileId){
+        return {
+          url:`https://pixeldrain.com/api/file/${encodeURIComponent(fileId)}?download`,
+          action:'download', direct:true, type:'Pixeldrain'
+        };
+      }
+    }catch{}
+  }
+
+  const direct = key === 'url directa' || key === 'torrent' || /\.(torrent|zip|rar|7z|exe|msi|iso)(?:$|[?#])/i.test(rawUrl);
+  return { url:rawUrl, action:direct ? 'download' : 'open', direct, type };
+}
+
+function a51_downloadTypeIcon(type){
+  const key = String(type || '').toLowerCase();
+  if(key.includes('mediafire')) return '🟦';
+  if(key.includes('pixeldrain')) return '🟪';
+  if(key.includes('akirabox')) return '🟢';
+  if(key.includes('mega')) return '🟥';
+  if(key.includes('google drive')) return '🟨';
+  if(key.includes('magnet')) return '🧲';
+  if(key.includes('torrent')) return '📄';
+  if(key.includes('url directa')) return '⚡';
+  return '🌐';
+}
+
 async function a51_syncProductDownloads(productId, downloads){
   const clean = (downloads || [])
     .map((item,index) => ({
