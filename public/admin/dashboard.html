@@ -182,8 +182,8 @@
       <select id="filter-availability">
         <option value="">Disponibilidad — todas</option>
         <option value="problem">Necesitan atención</option>
-        <option value="covered">Con respaldo torrent</option>
-        <option value="no-torrent">Sin torrent</option>
+        <option value="covered">Con respaldo BitTorrent</option>
+        <option value="no-torrent">Sin respaldo BitTorrent</option>
         <option value="links">Con enlaces</option>
         <option value="no-links">Sin enlaces</option>
       </select>
@@ -231,10 +231,15 @@
   }
 
   function hasTorrent(product){
-    const main = product?.files?.main;
-    if(!main) return false;
-    const name = String(main.name || '').toLowerCase();
-    return name.endsWith('.torrent') || name.includes('torrent');
+    const mainName = String(product?.files?.main?.name || '').toLowerCase();
+    const uploadedTorrent = mainName.endsWith('.torrent') || mainName.includes('torrent');
+    const linkedTorrent = (product?.downloads || []).some(item => {
+      if(item?.status === 'disabled') return false;
+      const type = String(item?.type || '').toLowerCase();
+      const url = String(item?.url || '').toLowerCase();
+      return type.includes('torrent') || type.includes('magnet') || url.startsWith('magnet:?');
+    });
+    return uploadedTorrent || linkedTorrent;
   }
 
   function availabilityState(product){
@@ -272,12 +277,12 @@
     const allDownloads = product.downloads || [];
     const disabled = allDownloads.filter(item => item.status === 'disabled').length;
     let alert = '';
-    if(state.noSource) alert = '<div class="availability-alert">⚠ Sin enlaces ni torrent de respaldo</div>';
+    if(state.noSource) alert = '<div class="availability-alert">⚠ Sin enlaces ni respaldo BitTorrent</div>';
     else if(state.noWorkingSource) alert = '<div class="availability-alert">⚠ Todos los enlaces están caídos y no hay torrent</div>';
-    else if(state.counts.down && state.torrent) alert = '<div class="availability-alert">Hay enlaces caídos, pero existe respaldo torrent</div>';
+    else if(state.counts.down && state.torrent) alert = '<div class="availability-alert">Hay enlaces caídos, pero existe respaldo BitTorrent</div>';
 
     return `<div class="availability-summary">
-      <div class="backup-line ${state.torrent ? 'yes' : 'no'}">${state.torrent ? '🧲 Torrent de respaldo ✓' : '○ Sin torrent de respaldo'}</div>
+      <div class="backup-line ${state.torrent ? 'yes' : 'no'}">${state.torrent ? '🧲 Torrent de respaldo ✓' : '○ Sin respaldo BitTorrent de respaldo'}</div>
       <div class="health-counts">
         ${!state.downloads.length ? '<span class="health-pill off">Sin enlaces</span>' : ''}
         ${state.counts.active ? `<span class="health-pill ok">${state.counts.active} activos</span>` : ''}
@@ -351,7 +356,14 @@
     let httpStatus = null;
     let reason = null;
 
-    try{
+    const type = String(download?.type || '').toLowerCase();
+    const url = String(download?.url || '').trim();
+    const isMagnet = type.includes('magnet') || url.toLowerCase().startsWith('magnet:?');
+
+    if(isMagnet){
+      healthStatus = url.toLowerCase().startsWith('magnet:?') ? 'active' : 'review';
+      reason = healthStatus === 'active' ? 'magnet-format' : 'invalid-magnet';
+    }else try{
       const response = await fetch(`/api/check-download-link?url=${encodeURIComponent(download.url)}`, {
         headers:{ 'Accept':'application/json' }
       });
