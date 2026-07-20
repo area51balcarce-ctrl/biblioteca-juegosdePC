@@ -56,6 +56,10 @@
 
 
   .download-list{ display:flex; flex-direction:column; gap:10px; }
+  .download-group{ display:grid; gap:10px; }
+  .download-group + .download-group{ margin-top:22px; padding-top:20px; border-top:1px solid var(--line); }
+  .download-group-title{ margin:0; font-family:var(--f-mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); }
+  .download-group-items{ display:flex; flex-direction:column; gap:10px; }
   .dl-item{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding:13px 14px; border:1px solid var(--line-bright); }
   .dl-item .lbl{ display:flex; flex-direction:column; gap:2px; min-width:0; }
   .dl-item .lbl b{ font-size:13.5px; font-weight:600; }
@@ -235,9 +239,12 @@
 
       activeDownloads.push({
         type: isTorrent ? 'Torrent' : file.fallbackType,
+        group_name: 'Descargas',
+        label: fileName || (isTorrent ? 'Archivo torrent' : file.fallbackType),
         url: signedUrl,
         status: 'active',
-        healthStatus: 'unchecked'
+        healthStatus: 'unchecked',
+        position: activeDownloads.length
       });
     }
 
@@ -247,10 +254,41 @@
       return type.includes('torrent') || type.includes('magnet') || url.startsWith('magnet:');
     });
 
-    const preparedDownloads = activeDownloads.map(item => ({
-      ...item,
-      prepared: a51_prepareDownloadLink(item)
-    })).filter(item => item.prepared.url);
+    const preparedDownloads = activeDownloads.map((item, index) => {
+      const groupName = String(item.group_name || '').trim() || 'Descargas';
+      const itemLabel = String(item.label || '').trim();
+
+      return {
+        ...item,
+        group_name: groupName,
+        label: itemLabel,
+        originalIndex: index,
+        prepared: a51_prepareDownloadLink(item)
+      };
+    }).filter(item => item.prepared.url);
+
+    const groupsMap = new Map();
+
+    preparedDownloads.forEach(item => {
+      if(!groupsMap.has(item.group_name)){
+        groupsMap.set(item.group_name, []);
+      }
+
+      groupsMap.get(item.group_name).push(item);
+    });
+
+    const getDownloadOrder = item =>
+      Number.isFinite(Number(item.position))
+        ? Number(item.position)
+        : item.originalIndex;
+
+    const downloadGroups = [...groupsMap.entries()].map(([name, items]) => ({
+      name,
+      items: items.sort((a, b) => {
+        const diff = getDownloadOrder(a) - getDownloadOrder(b);
+        return diff || a.originalIndex - b.originalIndex;
+      })
+    })).filter(group => group.items.length);
 
     const installText = publicInstallText(g.install);
 
@@ -354,16 +392,40 @@
           </div>
           <div class="modal-body">
             <div class="download-list">
-              ${preparedDownloads.length ? preparedDownloads.map(item => `
-                <div class="dl-item">
-                  <div class="lbl">
-                    <b>${esc(downloadLabel(item.prepared.type || item.type))}</b>
-                    <small>${item.healthStatus === 'down' ? 'Enlace caído' : item.healthStatus === 'review' ? 'Revisión manual' : item.prepared.direct ? 'Descarga directa' : 'Abrir servidor'}</small>
+              ${downloadGroups.length ? downloadGroups.map(group => `
+                <section class="download-group">
+                  <h3 class="download-group-title">${esc(group.name)}</h3>
+                  <div class="download-group-items">
+                    ${group.items.map(item => {
+                      const visibleLabel =
+                        String(item.label || '').trim()
+                        || String(item.prepared.type || item.type || 'Descarga').trim();
+
+                      const providerLabel = downloadLabel(item.prepared.type || item.type);
+
+                      const statusText =
+                        item.healthStatus === 'down'
+                          ? 'Enlace caído'
+                          : item.healthStatus === 'review'
+                            ? 'Revisión manual'
+                            : item.prepared.direct
+                              ? 'Descarga directa'
+                              : 'Abrir servidor';
+
+                      return `
+                        <div class="dl-item">
+                          <div class="lbl">
+                            <b>${esc(visibleLabel)}</b>
+                            <small>${esc(providerLabel)} · ${esc(statusText)}</small>
+                          </div>
+                          <a class="btn" href="${esc(item.prepared.url)}"
+                            ${item.prepared.action === 'download' ? 'download' : ''}
+                            ${item.prepared.action === 'open' && item.prepared.type !== 'Magnet' ? 'target="_blank" rel="noopener noreferrer"' : ''}>${item.prepared.type === 'Magnet' ? 'Abrir' : 'Descargar'}</a>
+                        </div>
+                      `;
+                    }).join('')}
                   </div>
-                  <a class="btn" href="${esc(item.prepared.url)}"
-                    ${item.prepared.action === 'download' ? 'download' : ''}
-                    ${item.prepared.action === 'open' && item.prepared.type !== 'Magnet' ? 'target="_blank" rel="noopener noreferrer"' : ''}>${item.prepared.type === 'Magnet' ? 'Abrir' : 'Descargar'}</a>
-                </div>
+                </section>
               `).join('') : '<div class="dl-empty">No hay enlaces disponibles.</div>'}
             </div>
 
