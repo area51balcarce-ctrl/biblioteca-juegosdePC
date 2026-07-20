@@ -166,7 +166,7 @@ const A51_PRODUCT_SELECT = `
   created_at, updated_at,
   categories ( id, name ),
   product_tags ( tags ( name ) ),
-  product_downloads ( id, type, url, status, position, health_status, checked_at )
+  product_downloads ( id, type, group_name, label, url, status, position, health_status, checked_at )
 `;
 
 function a51_publicCoverUrl(path){
@@ -197,15 +197,21 @@ function a51_mapProductRow(row){
     category: row.categories ? row.categories.name : '',
     tags: (row.product_tags || []).map(pt => pt.tags && pt.tags.name).filter(Boolean).join(', '),
     downloads: (row.product_downloads || [])
-      .map(item => ({
-        id: item.id,
-        type: item.type || 'Otro',
-        url: item.url || '',
-        status: item.status || 'active',
-        position: Number(item.position || 0),
-        healthStatus: item.health_status || 'unchecked',
-        checkedAt: item.checked_at || null
-      }))
+      .map((item,index) => {
+        const type = String(item.type || 'Otro').trim() || 'Otro';
+        const parsedPosition = Number(item.position);
+        return {
+          id: item.id,
+          type,
+          group_name: String(item.group_name || '').trim() || 'Descargas',
+          label: String(item.label || '').trim() || type || 'Descarga',
+          url: item.url || '',
+          status: item.status || 'active',
+          position: Number.isFinite(parsedPosition) ? parsedPosition : index,
+          healthStatus: item.health_status || 'unchecked',
+          checkedAt: item.checked_at || null
+        };
+      })
       .sort((a,b) => a.position - b.position),
     cover: row.cover_path ? { path: row.cover_path, name: row.cover_name, url: a51_publicCoverUrl(row.cover_path) } : null,
     files: {
@@ -417,14 +423,21 @@ function a51_downloadTypeIcon(type){
 }
 
 async function a51_syncProductDownloads(productId, downloads){
-  const clean = (downloads || [])
-    .map((item,index) => ({
-      product_id: productId,
-      type: String(item.type || 'Otro').trim().slice(0,50),
-      url: String(item.url || '').trim(),
-      status: ['active','review','disabled'].includes(item.status) ? item.status : 'active',
-      position: Number.isInteger(item.position) ? item.position : index
-    }))
+  const clean = (Array.isArray(downloads) ? downloads : [])
+    .filter(item => item && typeof item === 'object')
+    .map((item,index) => {
+      const type = String(item.type || 'Otro').trim().slice(0,50) || 'Otro';
+      const parsedPosition = Number(item.position);
+      return {
+        product_id: productId,
+        type,
+        group_name: String(item.group_name || '').trim() || 'Descargas',
+        label: String(item.label || '').trim() || type || 'Descarga',
+        url: String(item.url || '').trim(),
+        status: ['active','review','disabled'].includes(item.status) ? item.status : 'active',
+        position: Number.isFinite(parsedPosition) ? parsedPosition : index
+      };
+    })
     .filter(item => item.url);
 
   const invalid = clean.find(item => !a51_isValidDownloadUrl(item.url));
