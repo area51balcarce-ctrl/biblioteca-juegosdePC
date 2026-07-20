@@ -43,26 +43,33 @@
   .actions-bar{ display:flex; gap:12px; margin-top:10px; align-items:center; }
   .save-feedback{ font-family:var(--f-mono); font-size:12px; color:var(--accent); opacity:0; transition:opacity .2s; }
   .save-feedback.show{ opacity:1; }
-  .downloads-manager{ display:grid; gap:12px; }
+  .downloads-manager{ display:grid; gap:16px; }
+  .download-group{
+    border:1px solid var(--line-bright);
+    background:rgba(54,255,148,.025);
+    padding:14px;
+    display:grid;
+    gap:12px;
+  }
+  .download-group-head{
+    display:grid;
+    grid-template-columns:minmax(220px,1fr) auto auto;
+    gap:10px;
+    align-items:end;
+  }
+  .download-group-name{ margin:0; }
+  .download-group-links{ display:grid; gap:10px; }
   .download-row{
     display:grid;
-    grid-template-columns:minmax(145px,.9fr) minmax(130px,.8fr) minmax(135px,.8fr) minmax(230px,1.7fr) minmax(110px,.7fr) auto;
+    grid-template-columns:minmax(135px,.75fr) minmax(150px,.8fr) minmax(240px,1.7fr) minmax(110px,.65fr) auto;
     gap:10px;
     align-items:center;
     padding:12px;
     border:1px solid var(--line);
     background:var(--bg-elev);
   }
-  .download-field{ min-width:0; }
-  .download-field > span{
-    display:block; margin-bottom:5px; font-family:var(--f-mono); font-size:9px;
-    letter-spacing:.08em; text-transform:uppercase; color:var(--text-faint);
-  }
-  .download-row[data-group-start="true"]{
-    margin-top:8px; border-top-color:var(--accent);
-  }
   .download-row input,.download-row select{ margin:0; }
-  .download-remove{ white-space:nowrap; }
+  .download-remove,.download-group-remove{ white-space:nowrap; }
   .downloads-empty{
     padding:15px;
     border:1px dashed var(--line-bright);
@@ -71,8 +78,13 @@
     font-size:12px;
   }
   .downloads-help{ display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; }
-  @media (max-width:760px){
-    .download-row{ grid-template-columns:1fr; }
+  @media (max-width:860px){
+    .download-row{ grid-template-columns:1fr 1fr; }
+    .download-row .download-url{ grid-column:1 / -1; }
+  }
+  @media (max-width:680px){
+    .download-group-head,.download-row{ grid-template-columns:1fr; }
+    .download-row .download-url{ grid-column:auto; }
   }
   .form-error{
     display:none; font-family:var(--f-mono); font-size:12px; color:#ff8080;
@@ -275,14 +287,11 @@
       <div class="section">
         <h2>Administrador de descargas</h2>
         <div class="downloads-help">
-          <div class="hint">Organizá enlaces ilimitados por grupo. Ejemplo: Juego Base → Parte 1, Parte 2, Parte 3.</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button type="button" class="btn" id="add-download-btn">＋ Agregar enlace</button>
-            <button type="button" class="btn" id="add-download-group-btn">＋ Nuevo grupo</button>
-          </div>
+          <div class="hint">Creá grupos como “Juego base”, “DLC” o “Traducción”. Dentro de cada grupo podés agregar todos los enlaces que necesites.</div>
+          <button type="button" class="btn" id="add-download-group-btn">＋ Nuevo grupo</button>
         </div>
         <div class="downloads-manager" id="downloads-manager"></div>
-        <div class="downloads-empty" id="downloads-empty">Todavía no agregaste enlaces de descarga.</div>
+        <div class="downloads-empty" id="downloads-empty">Todavía no agregaste grupos de descarga.</div>
       </div>
 
       <div class="section">
@@ -370,32 +379,9 @@
     'URL directa','Otro'
   ];
 
-  function downloadField(label, control){
-    const wrap = document.createElement('div');
-    wrap.className = 'download-field';
-    const title = document.createElement('span');
-    title.textContent = label;
-    wrap.append(title, control);
-    return wrap;
-  }
-
-  function createDownloadRow(download={}){
+  function createDownloadRow(groupLinks, download={}){
     const row = document.createElement('div');
     row.className = 'download-row';
-
-    const group = document.createElement('input');
-    group.type = 'text';
-    group.className = 'download-group';
-    group.placeholder = 'Juego Base';
-    group.value = download.groupName || download.group_name || 'Juego Base';
-    group.setAttribute('aria-label','Grupo de descarga');
-
-    const label = document.createElement('input');
-    label.type = 'text';
-    label.className = 'download-label';
-    label.placeholder = 'Parte 1';
-    label.value = download.label || '';
-    label.setAttribute('aria-label','Etiqueta del enlace');
 
     const type = document.createElement('select');
     type.className = 'download-type';
@@ -408,6 +394,13 @@
     });
     const savedType = String(download.type || '').trim();
     type.value = DOWNLOAD_TYPES.includes(savedType) ? savedType : 'Otro';
+
+    const label = document.createElement('input');
+    label.type = 'text';
+    label.className = 'download-label';
+    label.placeholder = 'Ej: Parte 1, Mirror, FLAC';
+    label.value = download.label || '';
+    label.setAttribute('aria-label','Etiqueta del enlace');
 
     const url = document.createElement('input');
     url.type = 'text';
@@ -432,10 +425,10 @@
       ['active','✓ Activo'],
       ['review','⚠ Revisar'],
       ['disabled','⏸ Desactivado']
-    ].forEach(([value,text]) => {
+    ].forEach(([value,statusLabel]) => {
       const option = document.createElement('option');
       option.value = value;
-      option.textContent = text;
+      option.textContent = statusLabel;
       status.append(option);
     });
     status.value = download.status || 'active';
@@ -446,58 +439,107 @@
     remove.textContent = 'Eliminar';
     remove.addEventListener('click', () => {
       row.remove();
-      refreshDownloadGroups();
       updateDownloadsEmptyState();
     });
 
-    row.append(
-      downloadField('Grupo', group),
-      downloadField('Etiqueta', label),
-      downloadField('Servidor', type),
-      downloadField('URL', url),
-      downloadField('Estado', status),
-      remove
-    );
-    document.getElementById('downloads-manager').append(row);
-    group.addEventListener('input', refreshDownloadGroups);
-    refreshDownloadGroups();
+    row.append(type,label,url,status,remove);
+    groupLinks.append(row);
     updateDownloadsEmptyState();
-    return row;
   }
 
-  function refreshDownloadGroups(){
-    let previous = null;
-    document.querySelectorAll('#downloads-manager .download-row').forEach(row => {
-      const current = row.querySelector('.download-group')?.value.trim().toLowerCase() || 'juego base';
-      row.dataset.groupStart = String(previous !== null && current !== previous);
-      previous = current;
+  function createDownloadGroup(groupName='Grupo de descarga', downloads=[]){
+    const group = document.createElement('section');
+    group.className = 'download-group';
+
+    const head = document.createElement('div');
+    head.className = 'download-group-head';
+
+    const nameWrap = document.createElement('div');
+    nameWrap.className = 'field download-group-name';
+    const nameLabel = document.createElement('label');
+    nameLabel.textContent = 'Nombre del grupo';
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'download-group-name-input';
+    nameInput.placeholder = 'Ej: Juego base, DLC, Traducción';
+    nameInput.value = groupName || 'Grupo de descarga';
+    nameWrap.append(nameLabel,nameInput);
+
+    const addLink = document.createElement('button');
+    addLink.type = 'button';
+    addLink.className = 'btn download-add-link';
+    addLink.textContent = '＋ Agregar enlace';
+
+    const removeGroup = document.createElement('button');
+    removeGroup.type = 'button';
+    removeGroup.className = 'btn download-group-remove';
+    removeGroup.textContent = 'Eliminar grupo';
+
+    const links = document.createElement('div');
+    links.className = 'download-group-links';
+
+    addLink.addEventListener('click', () => createDownloadRow(links));
+    removeGroup.addEventListener('click', () => {
+      group.remove();
+      updateDownloadsEmptyState();
     });
+
+    head.append(nameWrap,addLink,removeGroup);
+    group.append(head,links);
+    document.getElementById('downloads-manager').append(group);
+
+    if(downloads.length){
+      downloads.forEach(download => createDownloadRow(links, download));
+    }else{
+      createDownloadRow(links);
+    }
+    updateDownloadsEmptyState();
   }
 
   function updateDownloadsEmptyState(){
-    const hasRows = document.querySelectorAll('#downloads-manager .download-row').length > 0;
-    document.getElementById('downloads-empty').style.display = hasRows ? 'none' : 'block';
+    const hasGroups = document.querySelectorAll('#downloads-manager .download-group').length > 0;
+    document.getElementById('downloads-empty').style.display = hasGroups ? 'none' : 'block';
   }
 
   function fillDownloads(downloads=[]){
-    document.getElementById('downloads-manager').replaceChildren();
-    (downloads || []).forEach(createDownloadRow);
-    refreshDownloadGroups();
+    const manager = document.getElementById('downloads-manager');
+    manager.replaceChildren();
+
+    const grouped = new Map();
+    (downloads || []).forEach(download => {
+      const groupName = String(download.group_name || download.groupName || 'Descarga principal').trim() || 'Descarga principal';
+      if(!grouped.has(groupName)) grouped.set(groupName, []);
+      grouped.get(groupName).push(download);
+    });
+
+    grouped.forEach((items,groupName) => {
+      items.sort((a,b) => Number(a.position || 0) - Number(b.position || 0));
+      createDownloadGroup(groupName,items);
+    });
     updateDownloadsEmptyState();
   }
 
   function collectDownloads(){
-    return [...document.querySelectorAll('#downloads-manager .download-row')]
-      .map((row,index) => ({
-        groupName: row.querySelector('.download-group').value.trim() || 'Juego Base',
-        group_name: row.querySelector('.download-group').value.trim() || 'Juego Base',
-        label: row.querySelector('.download-label').value.trim(),
-        type: row.querySelector('.download-type').value,
-        url: row.querySelector('.download-url').value.trim(),
-        status: row.querySelector('.download-status').value,
-        position: index
-      }))
-      .filter(item => item.url);
+    const downloads = [];
+    let position = 0;
+
+    document.querySelectorAll('#downloads-manager .download-group').forEach(group => {
+      const groupName = group.querySelector('.download-group-name-input').value.trim() || 'Descarga principal';
+      group.querySelectorAll('.download-row').forEach(row => {
+        const url = row.querySelector('.download-url').value.trim();
+        if(!url) return;
+        downloads.push({
+          type: row.querySelector('.download-type').value,
+          group_name: groupName,
+          label: row.querySelector('.download-label').value.trim(),
+          url,
+          status: row.querySelector('.download-status').value,
+          position: position++
+        });
+      });
+    });
+
+    return downloads;
   }
 
   function isYoutubeUrl(value){
@@ -950,19 +992,7 @@
     }
   }
 
-  document.getElementById('add-download-btn').addEventListener('click', () => {
-    const rows = [...document.querySelectorAll('#downloads-manager .download-row')];
-    const lastGroup = rows.at(-1)?.querySelector('.download-group')?.value.trim() || 'Juego Base';
-    const row = createDownloadRow({ groupName:lastGroup });
-    row.querySelector('.download-label').focus();
-  });
-  document.getElementById('add-download-group-btn').addEventListener('click', () => {
-    const row = createDownloadRow({ groupName:'', label:'' });
-    const groupInput = row.querySelector('.download-group');
-    groupInput.value = '';
-    groupInput.focus();
-    refreshDownloadGroups();
-  });
+  document.getElementById('add-download-group-btn').addEventListener('click', () => createDownloadGroup());
 
   document.getElementById('trailer-search-btn').addEventListener('click', () => searchGameTrailer());
   document.getElementById('trailer-view-btn').addEventListener('click', () => {
