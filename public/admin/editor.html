@@ -78,6 +78,26 @@
     font-size:12px;
   }
   .downloads-help{ display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; }
+  .downloads-import-modal{ position:fixed; inset:0; z-index:1200; display:none; align-items:center; justify-content:center; padding:20px; }
+  .downloads-import-modal.open{ display:flex; }
+  .downloads-import-backdrop{ position:absolute; inset:0; background:rgba(0,0,0,.78); backdrop-filter:blur(4px); }
+  .downloads-import-card{ position:relative; z-index:1; width:min(760px,100%); max-height:88vh; overflow:auto; border:1px solid var(--line-bright); background:var(--bg-elev); box-shadow:0 24px 80px rgba(0,0,0,.55); }
+  .downloads-import-head{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding:18px 20px; border-bottom:1px solid var(--line); }
+  .downloads-import-head h3{ margin:0; font-family:var(--f-mono); font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); }
+  .downloads-import-close{ width:38px; height:38px; border:1px solid var(--line-bright); background:transparent; color:var(--text); font-size:22px; cursor:pointer; }
+  .downloads-import-body{ padding:20px; }
+  .downloads-import-body textarea{ min-height:220px; font-family:var(--f-mono); font-size:12px; }
+  .downloads-import-actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:14px; }
+  .downloads-import-option{ display:flex; align-items:center; gap:8px; margin-right:auto; font-family:var(--f-mono); font-size:11px; color:var(--text-dim); }
+  .downloads-import-option input{ width:auto; }
+  .downloads-import-status{ min-height:18px; margin-top:12px; font-family:var(--f-mono); font-size:11px; color:var(--text-faint); }
+  .downloads-import-status.ok{ color:var(--accent); }
+  .downloads-import-status.error{ color:#ff8080; }
+  .downloads-import-preview{ display:grid; gap:8px; margin-top:14px; }
+  .downloads-import-preview-item{ padding:10px 12px; border:1px solid var(--line); background:var(--bg-panel-2); font-family:var(--f-mono); font-size:11px; }
+  .downloads-import-preview-item b{ color:var(--text); }
+  .downloads-import-preview-item small{ display:block; margin-top:4px; color:var(--text-faint); overflow-wrap:anywhere; }
+  body.downloads-import-open{ overflow:hidden; }
   @media (max-width:860px){
     .download-row{ grid-template-columns:1fr 1fr; }
     .download-row .download-url{ grid-column:1 / -1; }
@@ -288,10 +308,37 @@
         <h2>Administrador de descargas</h2>
         <div class="downloads-help">
           <div class="hint">Creá grupos como “Juego base”, “DLC” o “Traducción”. Dentro de cada grupo podés agregar todos los enlaces que necesites.</div>
-          <button type="button" class="btn" id="add-download-group-btn">＋ Nuevo grupo</button>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button type="button" class="btn" id="import-downloads-btn">Importar enlaces</button>
+            <button type="button" class="btn" id="add-download-group-btn">＋ Nuevo grupo</button>
+          </div>
         </div>
         <div class="downloads-manager" id="downloads-manager"></div>
         <div class="downloads-empty" id="downloads-empty">Todavía no agregaste grupos de descarga.</div>
+      </div>
+
+      <div class="downloads-import-modal" id="downloads-import-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="downloads-import-title">
+        <div class="downloads-import-backdrop" data-close-downloads-import></div>
+        <div class="downloads-import-card">
+          <div class="downloads-import-head">
+            <h3 id="downloads-import-title">Importar enlaces</h3>
+            <button type="button" class="downloads-import-close" aria-label="Cerrar" data-close-downloads-import>×</button>
+          </div>
+          <div class="downloads-import-body">
+            <div class="field">
+              <label for="downloads-import-input">Pegá texto, JSON, CSV, HTML o una lista de enlaces</label>
+              <textarea id="downloads-import-input" placeholder="Juego Base\nhttps://servidor.com/parte1\nhttps://servidor.com/parte2\n\nDLC\nhttps://servidor.com/dlc"></textarea>
+              <div class="hint">También acepta JSON con un array downloads, CSV con encabezados y HTML copiado con enlaces.</div>
+            </div>
+            <div class="downloads-import-actions">
+              <label class="downloads-import-option"><input type="checkbox" id="downloads-import-replace"> Reemplazar las descargas actuales</label>
+              <button type="button" class="btn" id="downloads-import-preview-btn">Vista previa</button>
+              <button type="button" class="btn btn-primary" id="downloads-import-apply-btn">Importar</button>
+            </div>
+            <div class="downloads-import-status" id="downloads-import-status"></div>
+            <div class="downloads-import-preview" id="downloads-import-preview"></div>
+          </div>
+        </div>
       </div>
 
       <div class="section">
@@ -541,6 +588,219 @@
 
     return downloads;
   }
+
+  function detectDownloadType(value){
+    const text = String(value || '').trim();
+    const lower = text.toLowerCase();
+    if(lower.startsWith('magnet:?')) return 'Magnet';
+    if(lower.includes('mediafire.com') || lower === 'mediafire') return 'MediaFire';
+    if(lower.includes('pixeldrain.com') || lower === 'pixeldrain') return 'Pixeldrain';
+    if(lower.includes('drive.google.com') || lower.includes('google drive')) return 'Google Drive';
+    if(lower.includes('mega.nz') || lower === 'mega') return 'Mega';
+    if(lower.includes('1fichier.com') || lower === '1fichier') return '1Fichier';
+    if(lower.includes('gofile.io') || lower === 'gofile') return 'GoFile';
+    if(lower.includes('buzzheavier.com') || lower === 'buzzheavier') return 'Buzzheavier';
+    if(lower.includes('qiwi.gg') || lower === 'qiwi') return 'Qiwi';
+    if(lower.includes('akirabox.com') || lower === 'akirabox') return 'AkiraBox';
+    if(lower.includes('.torrent') || lower === 'torrent') return 'Torrent';
+    if(/^https?:\/\//i.test(text)) return 'URL directa';
+    return DOWNLOAD_TYPES.includes(text) ? text : 'Otro';
+  }
+
+  function normalizeImportedDownload(item,index){
+    if(!item || typeof item !== 'object') return null;
+    const url = String(item.url || item.link || item.href || '').trim();
+    if(!url) return null;
+    const detectedType = detectDownloadType(item.type || item.provider || url);
+    const groupName = String(item.group_name || item.groupName || item.group || item.category || detectedType || 'Descargas').trim() || 'Descargas';
+    const label = String(item.label || item.name || item.title || '').trim() || detectedType || 'Descarga';
+    const status = ['active','review','disabled'].includes(item.status) ? item.status : 'active';
+    const parsedPosition = Number(item.position);
+    return {
+      type: detectedType,
+      group_name: groupName,
+      label,
+      url,
+      status,
+      position: Number.isFinite(parsedPosition) ? parsedPosition : index
+    };
+  }
+
+  function parseCsvLine(line){
+    const values = [];
+    let value = '';
+    let quoted = false;
+    for(let i=0;i<line.length;i++){
+      const char = line[i];
+      if(char === '"'){
+        if(quoted && line[i+1] === '"'){ value += '"'; i++; }
+        else quoted = !quoted;
+      }else if(char === ',' && !quoted){
+        values.push(value.trim());
+        value = '';
+      }else value += char;
+    }
+    values.push(value.trim());
+    return values;
+  }
+
+  function parseImportedCsv(text){
+    const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    if(lines.length < 2 || !lines[0].includes(',')) return [];
+    const headers = parseCsvLine(lines[0]).map(header => header.toLowerCase().replace(/\s+/g,'_'));
+    const accepted = ['type','provider','group_name','groupname','group','label','name','title','url','link','href','status','position'];
+    if(!headers.some(header => accepted.includes(header)) || !headers.some(header => ['url','link','href'].includes(header))) return [];
+    return lines.slice(1).map((line,index) => {
+      const values = parseCsvLine(line);
+      const item = {};
+      headers.forEach((header,column) => item[header] = values[column] || '');
+      return normalizeImportedDownload(item,index);
+    }).filter(Boolean);
+  }
+
+  function parseImportedHtml(text){
+    if(!/<[a-z][\s\S]*>/i.test(text)) return [];
+    const doc = new DOMParser().parseFromString(text,'text/html');
+    const links = [...doc.querySelectorAll('a[href]')];
+    return links.map((anchor,index) => {
+      const url = String(anchor.getAttribute('href') || '').trim();
+      if(!/^(https?:\/\/|magnet:\?)/i.test(url)) return null;
+      const type = detectDownloadType(url);
+      return normalizeImportedDownload({
+        type,
+        group_name:type,
+        label:String(anchor.textContent || '').trim() || `Parte ${index + 1}`,
+        url,
+        status:'active',
+        position:index
+      },index);
+    }).filter(Boolean);
+  }
+
+  function parseImportedText(text){
+    const lines = text.split(/\r?\n/).map(line => line.trim());
+    const downloads = [];
+    let groupName = 'Descargas';
+    let partByGroup = new Map();
+
+    lines.forEach(line => {
+      if(!line) return;
+      const urls = line.match(/(?:https?:\/\/[^\s<>'"]+|magnet:\?[^\s<>'"]+)/gi) || [];
+      if(!urls.length){
+        const cleanGroup = line.replace(/^grupo\s*:\s*/i,'').replace(/:$/,'').trim();
+        if(cleanGroup) groupName = cleanGroup;
+        return;
+      }
+
+      urls.forEach(url => {
+        const type = detectDownloadType(url);
+        const key = groupName.toLowerCase();
+        const part = (partByGroup.get(key) || 0) + 1;
+        partByGroup.set(key,part);
+        downloads.push(normalizeImportedDownload({
+          type,
+          group_name:groupName,
+          label:urls.length === 1 && line !== url
+            ? line.replace(url,'').replace(/^[-–—|,:;\s]+|[-–—|,:;\s]+$/g,'').trim() || `Parte ${part}`
+            : `Parte ${part}`,
+          url,
+          status:'active',
+          position:downloads.length
+        },downloads.length));
+      });
+    });
+    return downloads.filter(Boolean);
+  }
+
+  function parseImportedDownloads(raw){
+    const text = String(raw || '').trim();
+    if(!text) return [];
+
+    try{
+      const parsed = JSON.parse(text);
+      const items = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.downloads) ? parsed.downloads : [];
+      if(items.length) return items.map(normalizeImportedDownload).filter(Boolean);
+    }catch{}
+
+    const csv = parseImportedCsv(text);
+    if(csv.length) return csv;
+
+    const html = parseImportedHtml(text);
+    if(html.length) return html;
+
+    return parseImportedText(text);
+  }
+
+  function setDownloadsImportStatus(message,kind=''){
+    const status = document.getElementById('downloads-import-status');
+    status.textContent = message;
+    status.className = `downloads-import-status ${kind}`.trim();
+  }
+
+  function renderDownloadsImportPreview(downloads){
+    const preview = document.getElementById('downloads-import-preview');
+    preview.replaceChildren();
+    downloads.slice(0,30).forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'downloads-import-preview-item';
+      const title = document.createElement('b');
+      title.textContent = `${item.group_name} → ${item.label} (${item.type})`;
+      const url = document.createElement('small');
+      url.textContent = item.url;
+      row.append(title,url);
+      preview.append(row);
+    });
+    if(downloads.length > 30){
+      const extra = document.createElement('div');
+      extra.className = 'downloads-import-preview-item';
+      extra.textContent = `…y ${downloads.length - 30} enlaces más.`;
+      preview.append(extra);
+    }
+  }
+
+  function openDownloadsImporter(){
+    const modal = document.getElementById('downloads-import-modal');
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden','false');
+    document.body.classList.add('downloads-import-open');
+    document.getElementById('downloads-import-input').focus();
+  }
+
+  function closeDownloadsImporter(){
+    const modal = document.getElementById('downloads-import-modal');
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden','true');
+    document.body.classList.remove('downloads-import-open');
+  }
+
+  function previewImportedDownloads(){
+    const downloads = parseImportedDownloads(document.getElementById('downloads-import-input').value);
+    renderDownloadsImportPreview(downloads);
+    setDownloadsImportStatus(
+      downloads.length ? `${downloads.length} enlace${downloads.length === 1 ? '' : 's'} detectado${downloads.length === 1 ? '' : 's'}.` : 'No se detectaron enlaces válidos.',
+      downloads.length ? 'ok' : 'error'
+    );
+    return downloads;
+  }
+
+  function applyImportedDownloads(){
+    const downloads = previewImportedDownloads();
+    if(!downloads.length) return;
+    const replace = document.getElementById('downloads-import-replace').checked;
+    const existing = replace ? [] : collectDownloads();
+    fillDownloads([...existing,...downloads].map((item,index) => ({ ...item, position:index })));
+    closeDownloadsImporter();
+  }
+
+  document.getElementById('import-downloads-btn').addEventListener('click',openDownloadsImporter);
+  document.getElementById('downloads-import-preview-btn').addEventListener('click',previewImportedDownloads);
+  document.getElementById('downloads-import-apply-btn').addEventListener('click',applyImportedDownloads);
+  document.querySelectorAll('[data-close-downloads-import]').forEach(element => {
+    element.addEventListener('click',closeDownloadsImporter);
+  });
+  document.addEventListener('keydown',event => {
+    if(event.key === 'Escape' && document.getElementById('downloads-import-modal').classList.contains('open')) closeDownloadsImporter();
+  });
 
   function isYoutubeUrl(value){
     try{
