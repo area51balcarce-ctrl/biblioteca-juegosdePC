@@ -288,10 +288,7 @@
         <h2>Administrador de descargas</h2>
         <div class="downloads-help">
           <div class="hint">Creá grupos como “Juego base”, “DLC” o “Traducción”. Dentro de cada grupo podés agregar todos los enlaces que necesites.</div>
-          <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <button type="button" class="btn" id="import-downloads-btn">Importar enlaces</button>
-            <button type="button" class="btn" id="add-download-group-btn">＋ Nuevo grupo</button>
-          </div>
+          <button type="button" class="btn" id="add-download-group-btn">＋ Nuevo grupo</button>
         </div>
         <div class="downloads-manager" id="downloads-manager"></div>
         <div class="downloads-empty" id="downloads-empty">Todavía no agregaste grupos de descarga.</div>
@@ -377,7 +374,7 @@
   }
 
   const DOWNLOAD_TYPES = [
-    'MediaFire','Pixeldrain','Google Drive','Mega','Terabox','1Fichier',
+    'MediaFire','Pixeldrain','Google Drive','Mega','1Fichier',
     'GoFile','Buzzheavier','Qiwi','AkiraBox','Torrent','Magnet',
     'URL directa','Otro'
   ];
@@ -995,91 +992,7 @@
     }
   }
 
-  async function importDownloadsFromSource(){
-    const sourceUrl = window.prompt('Pegá la URL de la fuente autorizada que contiene los enlaces:');
-    if(sourceUrl === null) return;
-
-    const cleanUrl = sourceUrl.trim();
-    if(!cleanUrl){
-      showError('Tenés que ingresar una URL para importar los enlaces.');
-      return;
-    }
-
-    try{
-      new URL(cleanUrl);
-    }catch{
-      showError('La URL ingresada no es válida.');
-      return;
-    }
-
-    hideError();
-    const button = document.getElementById('import-downloads-btn');
-    const originalText = button.textContent;
-    button.disabled = true;
-    button.textContent = 'Importando…';
-
-    try{
-      const response = await fetch('/api/import-links', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: cleanUrl })
-      });
-
-      let data = {};
-      try{
-        data = await response.json();
-      }catch{
-        throw new Error('El endpoint no devolvió una respuesta JSON válida.');
-      }
-
-      if(!response.ok || !data.ok){
-        throw new Error(data.error || 'No se pudieron importar los enlaces.');
-      }
-
-      const importedDownloads = Array.isArray(data.downloads)
-        ? data.downloads.filter(download => download && String(download.url || '').trim())
-        : [];
-
-      if(!importedDownloads.length){
-        showError('La página fue leída correctamente, pero no se encontraron enlaces importables.');
-        return;
-      }
-
-      const currentDownloads = collectDownloads();
-      let finalDownloads = importedDownloads;
-
-      if(currentDownloads.length){
-        const replaceExisting = window.confirm(
-          `Se encontraron ${importedDownloads.length} enlaces.\n\n` +
-          'Aceptar: reemplazar las descargas actuales.\n' +
-          'Cancelar: conservarlas y agregar los enlaces nuevos.'
-        );
-        finalDownloads = replaceExisting
-          ? importedDownloads
-          : [...currentDownloads, ...importedDownloads];
-      }
-
-      finalDownloads = finalDownloads.map((download, index) => ({
-        type: String(download.type || 'Otro').trim() || 'Otro',
-        group_name: String(download.group_name || download.groupName || download.type || 'Descarga principal').trim() || 'Descarga principal',
-        label: String(download.label || '').trim(),
-        url: String(download.url || '').trim(),
-        status: String(download.status || 'active').trim() || 'active',
-        position: index
-      }));
-
-      fillDownloads(finalDownloads);
-      window.alert(`Importación terminada: ${importedDownloads.length} enlaces agregados al administrador.`);
-    }catch(error){
-      showError(error.message || 'No se pudieron importar los enlaces.');
-    }finally{
-      button.disabled = false;
-      button.textContent = originalText;
-    }
-  }
-
   document.getElementById('add-download-group-btn').addEventListener('click', () => createDownloadGroup());
-  document.getElementById('import-downloads-btn').addEventListener('click', importDownloadsFromSource);
 
   document.getElementById('trailer-search-btn').addEventListener('click', () => searchGameTrailer());
   document.getElementById('trailer-view-btn').addEventListener('click', () => {
