@@ -1,5 +1,6 @@
 const GITHUB_API = 'https://api.github.com';
 const REPOSITORY = 'microsoft/winget-pkgs';
+const WINGET_INDEX_API = 'https://api.winget.run/v2';
 
 function send(res, status, body){
   res.status(status)
@@ -26,6 +27,24 @@ async function githubJson(path, token){
     const detail = await response.text().catch(() => '');
     throw new Error(
       `GitHub respondió ${response.status}${detail ? `: ${detail.slice(0,180)}` : ''}`
+    );
+  }
+
+  return response.json();
+}
+
+async function wingetIndexJson(path){
+  const response = await fetch(`${WINGET_INDEX_API}${path}`, {
+    headers: {
+      'Accept': 'application/json',
+      'User-Agent': 'AREA51-Software-Catalog'
+    }
+  });
+
+  if(!response.ok){
+    const detail = await response.text().catch(() => '');
+    throw new Error(
+      `El índice WinGet respondió ${response.status}${detail ? `: ${detail.slice(0,180)}` : ''}`
     );
   }
 
@@ -236,102 +255,6 @@ function extractVersionFromPath(path=''){
   return parts.length >= 2 ? parts[parts.length - 2] : '';
 }
 
-function encodeRepositoryPath(path=''){
-  return String(path)
-    .split('/')
-    .filter(Boolean)
-    .map(part => encodeURIComponent(part))
-    .join('/');
-}
-
-async function getRepositoryContents(path, token){
-  const encodedPath = encodeRepositoryPath(path);
-  return githubJson(
-    `/repos/${REPOSITORY}/contents/${encodedPath}`,
-    token
-  );
-}
-
-function getVersionDirectoryFromManifestPath(path=''){
-  const parts = String(path).split('/').filter(Boolean);
-  if(parts.length < 2) return '';
-  parts.pop();
-  return parts.join('/');
-}
-
-function getPackageBasePath(packageId=''){
-  const parts = String(packageId).split('.').filter(Boolean);
-  if(parts.length < 2) return '';
-
-  return [
-    'manifests',
-    parts[0].charAt(0).toLowerCase(),
-    ...parts
-  ].join('/');
-}
-
-async function readManifestFile(item, token){
-  const yaml = await githubText(item.url, token);
-  return {
-    path: item.path,
-    htmlUrl: item.html_url,
-    yaml,
-    data: parseSimpleYaml(yaml),
-    version: extractVersionFromPath(item.path)
-  };
-}
-
-async function loadVersionDirectory(versionDirectory, token){
-  const files = await getRepositoryContents(versionDirectory, token);
-  if(!Array.isArray(files)) return [];
-
-  const yamlFiles = files.filter(item =>
-    item?.type === 'file' &&
-    /\.ya?ml$/i.test(item.name || '')
-  );
-
-  const manifests = [];
-
-  for(const item of yamlFiles){
-    try{
-      manifests.push(await readManifestFile(item, token));
-    }catch(error){
-      console.warn('No se pudo leer un archivo WinGet.', error.message);
-    }
-  }
-
-  return manifests;
-}
-
-function selectPackageFiles(files=[]){
-  const locale =
-    files.find(item => /\.locale\.es(?:-[a-z]+)?\.ya?ml$/i.test(item.path)) ||
-    files.find(item => /\.locale\.en-us\.ya?ml$/i.test(item.path)) ||
-    files.find(item => /\.locale\.[a-z-]+\.ya?ml$/i.test(item.path)) ||
-    files.find(item =>
-      !/\.installer\.ya?ml$/i.test(item.path) &&
-      !/\.locale\.[a-z-]+\.ya?ml$/i.test(item.path)
-    ) ||
-    files[0] ||
-    null;
-
-  const version =
-    files.find(item =>
-      /\.ya?ml$/i.test(item.path) &&
-      !/\.locale\.[a-z-]+\.ya?ml$/i.test(item.path) &&
-      !/\.installer\.ya?ml$/i.test(item.path)
-    ) ||
-    locale ||
-    files[0] ||
-    null;
-
-  const installer =
-    files.find(item => /\.installer\.ya?ml$/i.test(item.path)) ||
-    null;
-
-  return {locale, version, installer};
-}
-
 function scoreSearchResult(item, query){
   const data = item.data || {};
   const wanted = normalizeTitle(query);
@@ -352,11 +275,79 @@ function scoreSearchResult(item, query){
 async function searchManifests(query, token){
   const normalizedQuery = String(query).trim();
 
-  // GitHub Search localiza archivos relacionados. Después se abre la carpeta
-  // completa de cada versión para leer el manifiesto locale real, que es donde
-  // WinGet guarda PackageName, Publisher y Description.
+  // winget.run mantiene un índice preparado para búsquedas. Se usa únicamente
+  // para localizar PackageIdentifier. La ficha completa continúa leyéndose
+  // desde el repositorio oficial microsoft/winget-pkgs.
+  try{
+    const params = new URLSearchParams({
+      query: normalizedQuery,
+      partialMatch: 'true',
+      preferContains: 'true',
+      take: '12',
+      sample: '24'
+    });
+
+    const json = await wingetIndexJson(`/packages?${params.toString()}`);
+    const packages = Array.isArray(json?.Packages) ? json.Packages : [];
+
+    return packages
+      .map(item => {
+        const latest = item?.Latest || {};
+        return {
+          path: '',
+          htmlUrl: '',
+          yaml: '',
+          data: {
+            PackageIdentifier: item?.Id || '',
+            PackageName: latest?.Name || item?.Id || '',
+            Publisher: latest?.Publisher || '',
+            PackageVersion:
+              Array.isArray(item?.Versions) && item.Versions.length
+                ? item.Versions[0]
+                : '',
+            ShortDescription: latest?.Description || '',
+            Description: latest?.Description || '',
+            PackageUrl: latest?.Homepage || '',
+            License: latest?.License || '',
+            LicenseUrl: latest?.LicenseUrl || ''
+          },
+          version:
+            Array.isArray(item?.Versions) && item.Versions.length
+              ? item.Versions[0]
+              : '',
+          coverUrl:
+            item?.Logo ||
+            item?.IconUrl ||
+            item?.Banner ||
+            ''
+        };
+      })
+      .filter(item =>
+        item.data.PackageIdentifier &&
+        item.data.PackageName
+      )
+      .sort((a, b) => {
+        const scoreDifference =
+          scoreSearchResult(b, normalizedQuery) -
+          scoreSearchResult(a, normalizedQuery);
+
+        if(scoreDifference) return scoreDifference;
+
+        return String(a.data.PackageName)
+          .localeCompare(String(b.data.PackageName));
+      })
+      .slice(0, 8);
+  }catch(indexError){
+    console.warn(
+      'El índice de búsqueda WinGet no está disponible; se intenta el respaldo de GitHub.',
+      indexError.message
+    );
+  }
+
+  // Respaldo: GitHub Code Search. Puede no devolver resultados en todos los
+  // casos debido al tamaño del repositorio, pero evita que el endpoint falle.
   const encoded = encodeURIComponent(
-    `${normalizedQuery} repo:${REPOSITORY} path:manifests`
+    `${normalizedQuery} in:path repo:${REPOSITORY} path:manifests extension:yaml`
   );
 
   const search = await githubJson(
@@ -364,45 +355,27 @@ async function searchManifests(query, token){
     token
   );
 
-  const versionDirectories = [];
-  const seenDirectories = new Set();
-
-  for(const item of search.items || []){
-    const directory = getVersionDirectoryFromManifestPath(item.path);
-    if(!directory || seenDirectories.has(directory)) continue;
-
-    seenDirectories.add(directory);
-    versionDirectories.push(directory);
-
-    // Evita demasiadas consultas dentro de una sola función de Vercel.
-    if(versionDirectories.length >= 15) break;
-  }
-
   const candidates = [];
 
-  for(const directory of versionDirectories){
+  for(const item of search.items || []){
     try{
-      const files = await loadVersionDirectory(directory, token);
-      const selected = selectPackageFiles(files);
-      const data = {
-        ...(selected.version?.data || {}),
-        ...(selected.locale?.data || {})
-      };
+      const yaml = await githubText(item.url, token);
+      const data = parseSimpleYaml(yaml);
 
       if(!data.PackageIdentifier || !data.PackageName) continue;
 
       candidates.push({
-        path: selected.locale?.path || selected.version?.path || directory,
-        htmlUrl: selected.locale?.htmlUrl || selected.version?.htmlUrl || '',
-        yaml: selected.locale?.yaml || selected.version?.yaml || '',
+        path: item.path,
+        htmlUrl: item.html_url,
+        yaml,
         data,
         version:
           data.PackageVersion ||
-          extractVersionFromPath(selected.version?.path || directory)
+          extractVersionFromPath(item.path)
       });
     }catch(error){
       console.warn(
-        `No se pudo leer la carpeta WinGet ${directory}.`,
+        'No se pudo leer un resultado WinGet desde GitHub.',
         error.message
       );
     }
@@ -428,7 +401,6 @@ async function searchManifests(query, token){
   }
 
   return [...grouped.values()]
-    .filter(item => scoreSearchResult(item, normalizedQuery) > 0)
     .sort((a, b) => {
       const scoreDifference =
         scoreSearchResult(b, normalizedQuery) -
@@ -443,56 +415,66 @@ async function searchManifests(query, token){
 }
 
 async function findPackageManifest(packageId, token){
-  const basePath = getPackageBasePath(packageId);
-  if(!basePath) return null;
+  const encoded = encodeURIComponent(
+    `"PackageIdentifier: ${packageId}" repo:${REPOSITORY} path:manifests extension:yaml`
+  );
 
-  let versions;
+  const search = await githubJson(
+    `/search/code?q=${encoded}&per_page=50`,
+    token
+  );
 
-  try{
-    versions = await getRepositoryContents(basePath, token);
-  }catch(error){
-    if(String(error.message).includes('404')) return null;
-    throw error;
-  }
+  const matches = [];
 
-  if(!Array.isArray(versions)) return null;
-
-  const versionDirectories = versions
-    .filter(item => item?.type === 'dir')
-    .sort((a, b) => compareVersions(b.name, a.name));
-
-  for(const directory of versionDirectories){
+  for(const item of search.items || []){
     try{
-      const files = await loadVersionDirectory(directory.path, token);
-      if(!files.length) continue;
+      const yaml = await githubText(item.url, token);
+      const data = parseSimpleYaml(yaml);
 
-      const selected = selectPackageFiles(files);
-      const mergedData = {
-        ...(selected.version?.data || {}),
-        ...(selected.locale?.data || {})
-      };
+      if(data.PackageIdentifier !== packageId) continue;
 
-      if(mergedData.PackageIdentifier !== packageId) continue;
-
-      return {
-        latestVersion:
-          mergedData.PackageVersion ||
-          directory.name ||
-          '',
-        locale: selected.locale,
-        version: selected.version,
-        installer: selected.installer,
-        files
-      };
+      matches.push({
+        path: item.path,
+        htmlUrl: item.html_url,
+        yaml,
+        data,
+        version: data.PackageVersion || extractVersionFromPath(item.path)
+      });
     }catch(error){
-      console.warn(
-        `No se pudo leer la versión ${directory.name} de ${packageId}.`,
-        error.message
-      );
+      console.warn('No se pudo leer un manifiesto WinGet.', error.message);
     }
   }
 
-  return null;
+  if(!matches.length) return null;
+
+  matches.sort((a, b) => compareVersions(b.version, a.version));
+  const latestVersion = matches[0].version;
+  const latest = matches.filter(item => item.version === latestVersion);
+
+  const locale =
+    latest.find(item => /\.locale\.es(?:-[a-z]+)?\.yaml$/i.test(item.path)) ||
+    latest.find(item => /\.locale\.en-us\.yaml$/i.test(item.path)) ||
+    latest.find(item => /\.locale\.[a-z-]+\.yaml$/i.test(item.path)) ||
+    latest.find(item => !/\.installer\.yaml$/i.test(item.path));
+
+  const version =
+    latest.find(item => /\.yaml$/i.test(item.path) &&
+      !/\.locale\.[a-z-]+\.yaml$/i.test(item.path) &&
+      !/\.installer\.yaml$/i.test(item.path)) ||
+    locale ||
+    latest[0];
+
+  const installer =
+    latest.find(item => /\.installer\.yaml$/i.test(item.path)) ||
+    null;
+
+  return {
+    latestVersion,
+    locale,
+    version,
+    installer,
+    files: latest
+  };
 }
 
 function joinUnique(values){
@@ -663,6 +645,7 @@ module.exports = async function handler(req, res){
           item.data.ShortDescription ||
           item.data.Description ||
           '',
+        coverUrl: item.coverUrl || '',
         contentType: 'software',
         source: 'WinGet'
       }));
