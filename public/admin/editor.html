@@ -1081,14 +1081,32 @@
     }
   }
 
-  async function downloadAutomaticCover(candidates, name){
+  function canDisplayRemoteImage(url){
+    return new Promise(resolve => {
+      const testImage = new Image();
+      const timeout = setTimeout(() => resolve(false), 8000);
+
+      testImage.onload = () => {
+        clearTimeout(timeout);
+        resolve(true);
+      };
+      testImage.onerror = () => {
+        clearTimeout(timeout);
+        resolve(false);
+      };
+      testImage.referrerPolicy = 'no-referrer';
+      testImage.src = url;
+    });
+  }
+
+  async function downloadAutomaticCover(candidates, name, allowRemoteFallback=false){
     const urls = Array.isArray(candidates)
       ? candidates.filter(Boolean)
       : [candidates].filter(Boolean);
 
     if(!urls.length){
       clearAutomaticCover();
-      return;
+      return false;
     }
 
     clearAutomaticCover();
@@ -1121,9 +1139,25 @@
         preview.src = URL.createObjectURL(blob);
         preview.classList.add('show');
         markFile('cover', 'portada automática');
-        return;
+        return true;
       }catch(error){
         console.warn('No se pudo preparar una portada automática.', error);
+      }
+    }
+
+    if(allowRemoteFallback){
+      for(const url of urls){
+        if(!await canDisplayRemoteImage(url)) continue;
+
+        autoCoverUrl = url;
+        autoCoverFile = null;
+
+        const preview = document.getElementById('cover-preview');
+        preview.referrerPolicy = 'no-referrer';
+        preview.src = url;
+        preview.classList.add('show');
+        markFile('cover', 'portada automática remota');
+        return true;
       }
     }
 
@@ -1132,6 +1166,7 @@
       'La ficha se completó, pero ninguna portada automática pudo prepararse. Podés subirla manualmente.',
       'error'
     );
+    return false;
   }
 
   async function loadSmartProduct(id, type='game'){
@@ -1197,7 +1232,7 @@
 
       const coverCandidates = getCoverCandidates(product);
       if(coverCandidates.length){
-        await downloadAutomaticCover(coverCandidates, product.name);
+        await downloadAutomaticCover(coverCandidates, product.name, type === 'software');
       }
 
       setSmartStatus(
