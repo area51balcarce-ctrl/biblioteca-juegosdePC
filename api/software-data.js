@@ -918,8 +918,7 @@ async function buildProductFromIndexPackage(
       !officialData?.languages
         ? 'La fuente no informó idiomas verificables.'
         : ''
-    ].filter(Boolean).join('
-'),
+    ].filter(Boolean).join('\n'),
     changelog: translatedChangelog,
     sourceUrl: homepage,
     contentType: 'software',
