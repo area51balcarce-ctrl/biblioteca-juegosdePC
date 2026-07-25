@@ -660,8 +660,7 @@ async function buildProductFromIndexPackage(packageInfo={}, deeplApiKey=''){
       homepage ? `Sitio oficial informado por WinGet: ${homepage}` : '',
       !coverUrl ? 'WinGet no informó una imagen oficial para este software.' : '',
       'Los requisitos, idiomas y tamaño quedan vacíos cuando la fuente no los informa, para evitar datos inventados.'
-    ].filter(Boolean).join('
-'),
+    ].filter(Boolean).join('\n'),
     sourceUrl: homepage,
     contentType: 'software',
     updateMeta: {
