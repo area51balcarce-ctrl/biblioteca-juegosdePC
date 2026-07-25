@@ -597,6 +597,238 @@ function inferLegalBasis(data){
 }
 
 
+
+function encodeRepositoryPath(path=''){
+  return String(path)
+    .split('/')
+    .filter(Boolean)
+    .map(part => encodeURIComponent(part))
+    .join('/');
+}
+
+async function getRepositoryContents(path, token){
+  return githubJson(
+    `/repos/${REPOSITORY}/contents/${encodeRepositoryPath(path)}`,
+    token
+  );
+}
+
+function packageVersionPath(packageId='', version=''){
+  const parts = String(packageId).split('.').filter(Boolean);
+  if(parts.length < 2 || !version) return '';
+
+  return [
+    'manifests',
+    parts[0].charAt(0).toLowerCase(),
+    ...parts,
+    version
+  ].join('/');
+}
+
+function mapLocaleName(locale=''){
+  const value = String(locale).toLowerCase();
+
+  if(value.startsWith('es')) return 'Español';
+  if(value.startsWith('en')) return 'Inglés';
+  if(value.startsWith('pt')) return 'Portugués';
+  if(value.startsWith('fr')) return 'Francés';
+  if(value.startsWith('de')) return 'Alemán';
+  if(value.startsWith('it')) return 'Italiano';
+  if(value.startsWith('ja')) return 'Japonés';
+  if(value.startsWith('ko')) return 'Coreano';
+  if(value.startsWith('zh')) return 'Chino';
+  if(value.startsWith('ru')) return 'Ruso';
+  if(value.startsWith('nl')) return 'Neerlandés';
+  if(value.startsWith('pl')) return 'Polaco';
+  if(value.startsWith('tr')) return 'Turco';
+
+  return locale;
+}
+
+function extractYamlValue(yaml='', key=''){
+  const pattern = new RegExp(
+    `^\\s*${key}:\\s*(.+?)\\s*$`,
+    'mi'
+  );
+  const match = String(yaml).match(pattern);
+  return match ? decodeYamlScalar(match[1]) : '';
+}
+
+function extractInstallerUrls(yaml=''){
+  return [...String(yaml).matchAll(
+    /^\s*InstallerUrl:\s*(.+?)\s*$/gmi
+  )].map(match => decodeYamlScalar(match[1])).filter(Boolean);
+}
+
+function formatBytes(bytes){
+  const value = Number(bytes || 0);
+  if(!Number.isFinite(value) || value <= 0) return '';
+
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let size = value;
+  let index = 0;
+
+  while(size >= 1024 && index < units.length - 1){
+    size /= 1024;
+    index++;
+  }
+
+  const decimals = index >= 3 ? 2 : index >= 2 ? 1 : 0;
+  return `${size.toFixed(decimals)} ${units[index]}`;
+}
+
+async function getRemoteFileSize(url=''){
+  if(!url) return '';
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4500);
+
+  try{
+    const response = await fetch(url, {
+      method: 'HEAD',
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'AREA51-Software-Catalog'
+      }
+    });
+
+    if(!response.ok) return '';
+
+    const contentLength = response.headers.get('content-length');
+    return contentLength ? formatBytes(contentLength) : '';
+  }catch{
+    return '';
+  }finally{
+    clearTimeout(timeout);
+  }
+}
+
+async function loadOfficialManifestData(packageId, version, token){
+  const path = packageVersionPath(packageId, version);
+  if(!path) return null;
+
+  try{
+    const entries = await getRepositoryContents(path, token);
+    if(!Array.isArray(entries)) return null;
+
+    const yamlFiles = entries.filter(item =>
+      item?.type === 'file' &&
+      /\.ya?ml$/i.test(item.name || '')
+    );
+
+    const files = [];
+
+    for(const item of yamlFiles){
+      try{
+        const yaml = await githubText(item.url, token);
+        files.push({
+          name: item.name,
+          path: item.path,
+          htmlUrl: item.html_url,
+          yaml,
+          data: parseSimpleYaml(yaml)
+        });
+      }catch(error){
+        console.warn(
+          `No se pudo leer ${item.name}.`,
+          error.message
+        );
+      }
+    }
+
+    if(!files.length) return null;
+
+    const spanishLocale =
+      files.find(item => /\.locale\.es(?:-[a-z]+)?\.ya?ml$/i.test(item.name));
+
+    const englishLocale =
+      files.find(item => /\.locale\.en-us\.ya?ml$/i.test(item.name));
+
+    const anyLocale =
+      files.find(item => /\.locale\.[a-z-]+\.ya?ml$/i.test(item.name));
+
+    const localeFile = spanishLocale || englishLocale || anyLocale || null;
+    const installerFile =
+      files.find(item => /\.installer\.ya?ml$/i.test(item.name)) || null;
+
+    const baseFile =
+      files.find(item =>
+        !/\.installer\.ya?ml$/i.test(item.name) &&
+        !/\.locale\.[a-z-]+\.ya?ml$/i.test(item.name)
+      ) || null;
+
+    const localeValues = files
+      .map(item => item.data?.PackageLocale)
+      .filter(Boolean)
+      .map(mapLocaleName);
+
+    const installerLocales = installerFile
+      ? [...installerFile.yaml.matchAll(
+          /^\s*InstallerLocale:\s*(.+?)\s*$/gmi
+        )].map(match => mapLocaleName(decodeYamlScalar(match[1])))
+      : [];
+
+    const languages = joinUnique([
+      localeValues,
+      installerLocales
+    ]).join(', ');
+
+    const installerYaml = installerFile?.yaml || '';
+    const installerUrls = extractInstallerUrls(installerYaml);
+    const size = await getRemoteFileSize(installerUrls[0] || '');
+
+    const minimumOSVersion =
+      extractYamlValue(installerYaml, 'MinimumOSVersion');
+
+    const architecture =
+      extractYamlValue(installerYaml, 'Architecture');
+
+    const installerType =
+      extractYamlValue(installerYaml, 'InstallerType');
+
+    const reqMinParts = [
+      minimumOSVersion ? `Windows ${minimumOSVersion} o superior` : '',
+      architecture && architecture !== 'neutral'
+        ? `Arquitectura: ${architecture}`
+        : '',
+      installerType ? `Tipo de instalador: ${installerType}` : ''
+    ].filter(Boolean);
+
+    const releaseNotes = normalizeText(
+      localeFile?.data?.ReleaseNotes ||
+      baseFile?.data?.ReleaseNotes ||
+      ''
+    );
+
+    const releaseNotesUrl =
+      localeFile?.data?.ReleaseNotesUrl ||
+      baseFile?.data?.ReleaseNotesUrl ||
+      '';
+
+    return {
+      languages,
+      size,
+      reqMin: reqMinParts.join('\n'),
+      reqRec: '',
+      changelog: releaseNotes,
+      releaseNotesUrl,
+      manifestUrl:
+        localeFile?.htmlUrl ||
+        baseFile?.htmlUrl ||
+        installerFile?.htmlUrl ||
+        '',
+      installerUrl: installerUrls[0] || ''
+    };
+  }catch(error){
+    console.warn(
+      `No se pudo enriquecer ${packageId} desde el manifiesto oficial.`,
+      error.message
+    );
+    return null;
+  }
+}
+
 function splitPackageIdentifier(packageId=''){
   const parts = String(packageId).split('.').filter(Boolean);
   if(parts.length < 2) return null;
@@ -607,7 +839,11 @@ function splitPackageIdentifier(packageId=''){
   };
 }
 
-async function buildProductFromIndexPackage(packageInfo={}, deeplApiKey=''){
+async function buildProductFromIndexPackage(
+  packageInfo={},
+  deeplApiKey='',
+  officialData=null
+){
   const latest = packageInfo.Latest || {};
   const packageIdentifier = packageInfo.Id || '';
   const version =
@@ -621,7 +857,11 @@ async function buildProductFromIndexPackage(packageInfo={}, deeplApiKey=''){
   const rawTags = Array.isArray(latest.Tags) ? latest.Tags : [];
   const tags = joinUnique([rawTags, publisher]);
   const originalDescription = normalizeText(latest.Description || '');
-  const description = await translateToSpanish(originalDescription, deeplApiKey);
+  const description = await translateToSpanish(
+    originalDescription,
+    deeplApiKey
+  );
+
   const category = inferSoftwareCategory({
     name: latest.Name || packageIdentifier,
     description: originalDescription,
@@ -634,6 +874,11 @@ async function buildProductFromIndexPackage(packageInfo={}, deeplApiKey=''){
     packageInfo.Banner ||
     fallbackCoverUrl(homepage);
 
+  const translatedChangelog = await translateToSpanish(
+    officialData?.changelog || '',
+    deeplApiKey
+  );
+
   return {
     wingetId: packageIdentifier,
     name: latest.Name || packageIdentifier,
@@ -644,11 +889,11 @@ async function buildProductFromIndexPackage(packageInfo={}, deeplApiKey=''){
       LicenseUrl: latest.LicenseUrl || ''
     }),
     description,
-    reqMin: '',
-    reqRec: '',
-    size: '',
+    reqMin: officialData?.reqMin || '',
+    reqRec: officialData?.reqRec || '',
+    size: officialData?.size || '',
     version,
-    languages: '',
+    languages: officialData?.languages || '',
     tags: tags.slice(0, 12).join(', '),
     coverUrl,
     install: packageIdentifier
@@ -658,19 +903,47 @@ async function buildProductFromIndexPackage(packageInfo={}, deeplApiKey=''){
       publisher ? `Desarrollador/editor: ${publisher}.` : '',
       license ? `Licencia informada por WinGet: ${license}.` : '',
       homepage ? `Sitio oficial informado por WinGet: ${homepage}` : '',
-      !coverUrl ? 'WinGet no informó una imagen oficial para este software.' : '',
-      'Los requisitos, idiomas y tamaño quedan vacíos cuando la fuente no los informa, para evitar datos inventados.'
-    ].filter(Boolean).join('\n'),
+      officialData?.releaseNotesUrl
+        ? `Notas oficiales de la versión: ${officialData.releaseNotesUrl}`
+        : '',
+      !coverUrl
+        ? 'WinGet no informó una imagen oficial para este software.'
+        : '',
+      !officialData?.reqMin
+        ? 'La fuente no informó requisitos mínimos verificables.'
+        : '',
+      !officialData?.size
+        ? 'La fuente no permitió verificar automáticamente el tamaño del instalador.'
+        : '',
+      !officialData?.languages
+        ? 'La fuente no informó idiomas verificables.'
+        : ''
+    ].filter(Boolean).join('
+'),
+    changelog: translatedChangelog,
     sourceUrl: homepage,
     contentType: 'software',
     updateMeta: {
       wingetId: packageIdentifier,
       fetchedAt: new Date().toISOString(),
-      translatedWithDeepL: Boolean(deeplApiKey && description && description !== originalDescription)
+      manifestUrl: officialData?.manifestUrl || '',
+      installerUrl: officialData?.installerUrl || '',
+      translatedWithDeepL: Boolean(
+        deeplApiKey &&
+        description &&
+        description !== originalDescription
+      )
     },
     source: [
       'WinGet',
-      deeplApiKey && description !== originalDescription ? 'DeepL' : ''
+      officialData ? 'Manifiesto oficial' : '',
+      deeplApiKey &&
+      (
+        description !== originalDescription ||
+        translatedChangelog !== (officialData?.changelog || '')
+      )
+        ? 'DeepL'
+        : ''
     ].filter(Boolean).join(' + ')
   };
 }
@@ -832,8 +1105,23 @@ module.exports = async function handler(req, res){
         });
       }
 
+      const packageVersion =
+        Array.isArray(packageInfo.Versions) && packageInfo.Versions.length
+          ? packageInfo.Versions[0]
+          : '';
+
+      const officialData = await loadOfficialManifestData(
+        packageInfo.Id || id,
+        packageVersion,
+        githubToken
+      );
+
       return send(res, 200, {
-        product: await buildProductFromIndexPackage(packageInfo, deeplApiKey)
+        product: await buildProductFromIndexPackage(
+          packageInfo,
+          deeplApiKey,
+          officialData
+        )
       });
     }catch(indexError){
       if(String(indexError.message).includes('404')){
