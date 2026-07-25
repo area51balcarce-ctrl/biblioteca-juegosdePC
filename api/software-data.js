@@ -211,6 +211,83 @@ function normalizeText(value=''){
     .trim();
 }
 
+async function translateToSpanish(text, apiKey){
+  const original = normalizeText(text);
+  if(!original || !apiKey) return original;
+
+  const endpoint = apiKey.endsWith(':fx')
+    ? 'https://api-free.deepl.com/v2/translate'
+    : 'https://api.deepl.com/v2/translate';
+
+  try{
+    const body = new URLSearchParams();
+    body.set('text', original);
+    body.set('target_lang', 'ES');
+    body.set('preserve_formatting', '1');
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `DeepL-Auth-Key ${apiKey}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body
+    });
+
+    if(!response.ok){
+      const detail = await response.text().catch(() => '');
+      console.warn(`DeepL respondió ${response.status}: ${detail.slice(0,160)}`);
+      return original;
+    }
+
+    const json = await response.json();
+    return normalizeText(json?.translations?.[0]?.text || original);
+  }catch(error){
+    console.warn('DeepL no disponible; se conserva la descripción original.', error);
+    return original;
+  }
+}
+
+function inferSoftwareCategory({name='', description='', tags=[]}={}){
+  const text = normalizeTitle([
+    name,
+    description,
+    ...(Array.isArray(tags) ? tags : [])
+  ].join(' '));
+
+  const rules = [
+    ['Navegadores', /\b(browser|navegador|chrome|firefox|edge|brave|opera)\b/],
+    ['Multimedia', /\b(multimedia|media player|video player|audio player|codec|vlc|music|video|audio)\b/],
+    ['Streaming y grabación', /\b(streaming|stream|broadcast|recording|screen recorder|obs)\b/],
+    ['Diseño gráfico', /\b(design|graphic|photo|image editor|illustration|photoshop|gimp|drawing)\b/],
+    ['Edición de video', /\b(video editor|editing video|editor de video|davinci|premiere)\b/],
+    ['Audio', /\b(audio editor|music production|daw|sound editor|audacity)\b/],
+    ['Ofimática', /\b(office|spreadsheet|word processor|document editor|pdf|libreoffice)\b/],
+    ['Programación', /\b(developer|development|programming|code editor|ide|compiler|github|visual studio)\b/],
+    ['Compresión', /\b(archive|archiver|compression|zip|rar|7 zip|7zip|winrar)\b/],
+    ['Seguridad', /\b(antivirus|security|firewall|malware|password manager|vpn)\b/],
+    ['Comunicación', /\b(chat|messaging|communication|discord|telegram|whatsapp|meeting|conference)\b/],
+    ['Utilidades', /\b(utility|utilities|system tool|maintenance|cleanup|monitoring|backup|driver)\b/],
+    ['Descargas', /\b(download manager|torrent|bittorrent|download)\b/],
+    ['Juegos y plataformas', /\b(game launcher|gaming platform|steam|epic games|gog galaxy)\b/]
+  ];
+
+  for(const [category, pattern] of rules){
+    if(pattern.test(text)) return category;
+  }
+
+  return 'Software de PC';
+}
+
+function fallbackCoverUrl(homepage=''){
+  try{
+    const url = new URL(homepage);
+    return `${url.origin}/favicon.ico`;
+  }catch{
+    return '';
+  }
+}
+
 function normalizeTitle(value=''){
   return String(value)
     .toLowerCase()
@@ -530,7 +607,7 @@ function splitPackageIdentifier(packageId=''){
   };
 }
 
-function buildProductFromIndexPackage(packageInfo={}){
+async function buildProductFromIndexPackage(packageInfo={}, deeplApiKey=''){
   const latest = packageInfo.Latest || {};
   const packageIdentifier = packageInfo.Id || '';
   const version =
@@ -541,47 +618,61 @@ function buildProductFromIndexPackage(packageInfo={}){
   const publisher = latest.Publisher || '';
   const license = latest.License || '';
   const homepage = latest.Homepage || '';
-  const tags = joinUnique([
-    Array.isArray(latest.Tags) ? latest.Tags : [],
-    publisher
-  ]);
+  const rawTags = Array.isArray(latest.Tags) ? latest.Tags : [];
+  const tags = joinUnique([rawTags, publisher]);
+  const originalDescription = normalizeText(latest.Description || '');
+  const description = await translateToSpanish(originalDescription, deeplApiKey);
+  const category = inferSoftwareCategory({
+    name: latest.Name || packageIdentifier,
+    description: originalDescription,
+    tags: rawTags
+  });
+
+  const coverUrl =
+    packageInfo.Logo ||
+    packageInfo.IconUrl ||
+    packageInfo.Banner ||
+    fallbackCoverUrl(homepage);
 
   return {
     wingetId: packageIdentifier,
     name: latest.Name || packageIdentifier,
-    category: 'Software de PC',
+    category,
     status: 'ok',
     legalBasis: inferLegalBasis({
       License: license,
       LicenseUrl: latest.LicenseUrl || ''
     }),
-    description: normalizeText(latest.Description || ''),
+    description,
     reqMin: '',
     reqRec: '',
     size: '',
     version,
     languages: '',
     tags: tags.slice(0, 12).join(', '),
-    coverUrl:
-      packageInfo.Logo ||
-      packageInfo.IconUrl ||
-      packageInfo.Banner ||
-      '',
+    coverUrl,
     install: packageIdentifier
       ? `Instalar desde WinGet: winget install --id ${packageIdentifier} --exact`
       : '',
     notes: [
       publisher ? `Desarrollador/editor: ${publisher}.` : '',
       license ? `Licencia informada por WinGet: ${license}.` : '',
-      homepage ? `Sitio oficial informado por WinGet: ${homepage}` : ''
-    ].filter(Boolean).join('\n'),
+      homepage ? `Sitio oficial informado por WinGet: ${homepage}` : '',
+      !coverUrl ? 'WinGet no informó una imagen oficial para este software.' : '',
+      'Los requisitos, idiomas y tamaño quedan vacíos cuando la fuente no los informa, para evitar datos inventados.'
+    ].filter(Boolean).join('
+'),
     sourceUrl: homepage,
     contentType: 'software',
     updateMeta: {
       wingetId: packageIdentifier,
-      fetchedAt: new Date().toISOString()
+      fetchedAt: new Date().toISOString(),
+      translatedWithDeepL: Boolean(deeplApiKey && description && description !== originalDescription)
     },
-    source: 'WinGet'
+    source: [
+      'WinGet',
+      deeplApiKey && description !== originalDescription ? 'DeepL' : ''
+    ].filter(Boolean).join(' + ')
   };
 }
 
@@ -677,6 +768,7 @@ module.exports = async function handler(req, res){
   }
 
   const githubToken = process.env.GITHUB_TOKEN || '';
+  const deeplApiKey = process.env.DEEPL_API_KEY || '';
   if(!githubToken){
     return send(res, 500, {
       error: 'Falta configurar GITHUB_TOKEN en Vercel.'
@@ -742,7 +834,7 @@ module.exports = async function handler(req, res){
       }
 
       return send(res, 200, {
-        product: buildProductFromIndexPackage(packageInfo)
+        product: await buildProductFromIndexPackage(packageInfo, deeplApiKey)
       });
     }catch(indexError){
       if(String(indexError.message).includes('404')){
