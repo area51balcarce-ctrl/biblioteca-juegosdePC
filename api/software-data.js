@@ -281,10 +281,8 @@ async function searchManifests(query, token){
   try{
     const params = new URLSearchParams({
       query: normalizedQuery,
-      partialMatch: 'true',
-      preferContains: 'true',
-      take: '12',
-      sample: '24'
+      ensureContains: 'true',
+      take: '12'
     });
 
     const json = await wingetIndexJson(`/packages?${params.toString()}`);
