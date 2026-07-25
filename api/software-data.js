@@ -248,42 +248,50 @@ async function translateToSpanish(text, apiKey){
   }
 }
 
-function inferSoftwareCategory({name='', description='', tags=[]}={}){
-  const text = normalizeTitle([
+function inferSoftwareCategory({
+  id='',
+  name='',
+  publisher='',
+  description='',
+  tags=[]
+}={}){
+  const searchable = normalizeTitle([
+    id,
     name,
+    publisher,
     description,
     ...(Array.isArray(tags) ? tags : [])
   ].join(' '));
 
-  const rules = [
-    ['Navegadores', /(browser|navegador|chrome|firefox|edge|brave|opera|vivaldi|tor browser)/],
-    ['Multimedia', /(multimedia|media player|video player|audio player|codec|vlc|playback|dvd|blu ray|streaming media)/],
-    ['Audio', /(audio editor|music production|daw|sound editor|audacity|foobar|equalizer|mixer|podcast|music player)/],
-    ['Edición de video', /(video editor|video editing|editor de video|davinci|premiere|shotcut|kdenlive|openshot|handbrake)/],
-    ['Streaming y grabación', /(streaming|stream|broadcast|recording|screen recorder|screen capture|obs|capture card)/],
-    ['Diseño gráfico', /(design|graphic|graphics|photo editor|image editor|illustration|photoshop|gimp|krita|drawing|vector)/],
-    ['Modelado 3D y CAD', /(3d|modeling|modelling|cad|autocad|blender|sketchup|solidworks|freecad)/],
-    ['Ofimática', /(office|spreadsheet|word processor|document editor|presentation|pdf|libreoffice|onlyoffice|notepad)/],
-    ['Programación', /(developer|development|programming|code editor|ide|compiler|github|gitlab|visual studio|vscode|sdk|terminal)/],
-    ['Bases de datos', /(database|sql|mysql|postgres|sqlite|mongodb|dbeaver|phpmyadmin)/],
-    ['Inteligencia artificial', /(artificial intelligence|machine learning|ai tool|chatbot|llm|stable diffusion|ollama|comfyui)/],
-    ['Compresión', /(archive|archiver|compression|compressor|zip|rar|7 zip|7zip|winrar|peazip)/],
-    ['Seguridad', /(antivirus|security|firewall|malware|password manager|vpn|encryption|privacy|authenticator)/],
-    ['Comunicación', /(chat|messaging|communication|discord|telegram|whatsapp|meeting|conference|zoom|teams|slack)/],
-    ['Redes e Internet', /(network|networking|wifi|wi fi|lan|remote desktop|ftp|ssh|dns|proxy|internet tool)/],
-    ['Descargas', /(download manager|torrent|bittorrent|download|jdownloader|qbittorrent)/],
-    ['Copias de seguridad', /(backup|restore|recovery|disk image|clone|sync|synchronization)/],
-    ['Mantenimiento y sistema', /(utility|utilities|system tool|maintenance|cleanup|optimizer|monitoring|driver|benchmark|hardware info)/],
-    ['Virtualización', /(virtualization|virtual machine|vmware|virtualbox|hyper v|emulator|emulation)/],
-    ['Emulación', /(emulator|emulation|retroarch|dolphin emulator|pcsx|rpcs3|xenia|yuzu|ryujinx)/],
-    ['Plataformas de juegos', /(game launcher|gaming platform|steam|epic games|gog galaxy|ubisoft connect|battle net|ea app)/],
-    ['Educación', /(education|learning|study|school|classroom|language learning|training)/],
-    ['Finanzas', /(finance|accounting|budget|invoice|billing|banking|trading|cryptocurrency)/],
-    ['Productividad', /(productivity|task manager|notes|calendar|organizer|project management|pomodoro)/]
+  const exactRules = [
+    ['Streaming y grabación', /\b(obsproject|obs studio|streamlabs|xsplit|screen recorder|screen capture|broadcast|livestream|live streaming|recording)\b/],
+    ['Comunicación', /\b(discord|telegram|whatsapp|slack|zoom|microsoft teams|teamspeak|messaging|communication|voice chat|video call|conference)\b/],
+    ['Programación', /\b(visualstudiocode|visual studio code|vscode|code editor|source code editor|ide|compiler|developer tools|development environment|programming)\b/],
+    ['Modelado 3D y CAD', /\b(blender|autocad|freecad|sketchup|solidworks|3d modeling|3d modelling|computer aided design|cad)\b/],
+    ['Multimedia', /\b(videolan|vlc|media player|multimedia player|video player|audio player|playback|codec|dvd|vcd|blu ray)\b/],
+    ['Navegadores', /\b(google chrome|mozilla firefox|microsoft edge|brave browser|opera browser|vivaldi|tor browser|web browser|navegador)\b/],
+    ['Audio', /\b(audacity|foobar|music player|audio editor|sound editor|music production|digital audio workstation|daw|equalizer|podcast)\b/],
+    ['Edición de video', /\b(davinci resolve|adobe premiere|shotcut|kdenlive|openshot|handbrake|video editor|video editing)\b/],
+    ['Diseño gráfico', /\b(adobe photoshop|gimp|krita|inkscape|photo editor|image editor|graphic design|illustration|vector graphics)\b/],
+    ['Ofimática', /\b(microsoft office|libreoffice|onlyoffice|spreadsheet|word processor|presentation software|document editor|pdf editor)\b/],
+    ['Bases de datos', /\b(mysql|postgresql|sqlite|mongodb|dbeaver|database|sql client|database manager)\b/],
+    ['Inteligencia artificial', /\b(stable diffusion|ollama|comfyui|machine learning|artificial intelligence|large language model|llm|ai tool|chatbot)\b/],
+    ['Compresión', /\b(7 zip|7zip|winrar|peazip|archive manager|archiver|compression|compressor|zip|rar)\b/],
+    ['Seguridad', /\b(antivirus|anti malware|firewall|password manager|vpn|encryption|security|privacy|authenticator)\b/],
+    ['Redes e Internet', /\b(remote desktop|file transfer protocol|ftp client|ssh client|network monitor|networking|proxy|dns|wifi|wi fi|lan)\b/],
+    ['Descargas', /\b(jdownloader|qbittorrent|bittorrent|torrent client|download manager)\b/],
+    ['Copias de seguridad', /\b(backup|restore|recovery|disk image|disk clone|file synchronization)\b/],
+    ['Mantenimiento y sistema', /\b(system utility|system tool|cleanup|optimizer|hardware monitor|benchmark|driver updater|maintenance)\b/],
+    ['Virtualización', /\b(vmware|virtualbox|hyper v|virtual machine|virtualization)\b/],
+    ['Emulación', /\b(retroarch|dolphin emulator|pcsx|rpcs3|xenia|yuzu|ryujinx|emulator|emulation)\b/],
+    ['Plataformas de juegos', /\b(steam client|epic games launcher|gog galaxy|ubisoft connect|battle net|ea app|game launcher|gaming platform)\b/],
+    ['Educación', /\b(education|learning|study|classroom|language learning|training software)\b/],
+    ['Finanzas', /\b(accounting|budget|invoice|billing|banking|trading|cryptocurrency|finance)\b/],
+    ['Productividad', /\b(task manager|note taking|calendar|organizer|project management|pomodoro|productivity)\b/]
   ];
 
-  for(const [category, pattern] of rules){
-    if(pattern.test(text)) return category;
+  for(const [category, pattern] of exactRules){
+    if(pattern.test(searchable)) return category;
   }
 
   return 'Software de PC';
@@ -295,6 +303,110 @@ function fallbackCoverUrl(homepage=''){
     return `${url.origin}/favicon.ico`;
   }catch{
     return '';
+  }
+}
+
+function resolveWebUrl(value='', baseUrl=''){
+  const clean = String(value || '').trim();
+  if(!clean) return '';
+
+  try{
+    const resolved = new URL(clean, baseUrl);
+    return /^https?:$/i.test(resolved.protocol) ? resolved.toString() : '';
+  }catch{
+    return '';
+  }
+}
+
+function extractMetaContent(html='', property=''){
+  const escaped = property.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const patterns = [
+    new RegExp(
+      `<meta[^>]+(?:property|name)=["']${escaped}["'][^>]+content=["']([^"']+)["'][^>]*>`,
+      'i'
+    ),
+    new RegExp(
+      `<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${escaped}["'][^>]*>`,
+      'i'
+    )
+  ];
+
+  for(const pattern of patterns){
+    const match = String(html).match(pattern);
+    if(match?.[1]) return match[1].replace(/&amp;/gi, '&').trim();
+  }
+
+  return '';
+}
+
+function extractLinkHref(html='', relPattern=''){
+  const patterns = [
+    new RegExp(
+      `<link[^>]+rel=["'][^"']*${relPattern}[^"']*["'][^>]+href=["']([^"']+)["'][^>]*>`,
+      'i'
+    ),
+    new RegExp(
+      `<link[^>]+href=["']([^"']+)["'][^>]+rel=["'][^"']*${relPattern}[^"']*["'][^>]*>`,
+      'i'
+    )
+  ];
+
+  for(const pattern of patterns){
+    const match = String(html).match(pattern);
+    if(match?.[1]) return match[1].replace(/&amp;/gi, '&').trim();
+  }
+
+  return '';
+}
+
+async function getOfficialLargeCover(homepage=''){
+  const pageUrl = resolveWebUrl(homepage);
+  if(!pageUrl) return '';
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
+
+  try{
+    const response = await fetch(pageUrl, {
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: {
+        'Accept': 'text/html,application/xhtml+xml',
+        'User-Agent': 'Mozilla/5.0 AREA51-Software-Catalog'
+      }
+    });
+
+    if(!response.ok) return '';
+
+    const contentType = response.headers.get('content-type') || '';
+    if(!contentType.includes('text/html')) return '';
+
+    const html = (await response.text()).slice(0, 750000);
+    const finalUrl = response.url || pageUrl;
+
+    const candidates = [
+      extractMetaContent(html, 'og:image:secure_url'),
+      extractMetaContent(html, 'og:image'),
+      extractMetaContent(html, 'twitter:image'),
+      extractMetaContent(html, 'twitter:image:src'),
+      extractLinkHref(html, 'apple-touch-icon'),
+      extractLinkHref(html, 'icon')
+    ];
+
+    for(const candidate of candidates){
+      const resolved = resolveWebUrl(candidate, finalUrl);
+      if(resolved) return resolved;
+    }
+
+    return '';
+  }catch(error){
+    console.warn(
+      `No se pudo obtener una imagen grande desde ${pageUrl}.`,
+      error.message
+    );
+    return '';
+  }finally{
+    clearTimeout(timeout);
   }
 }
 
@@ -907,15 +1019,20 @@ async function buildProductFromIndexPackage(
   );
 
   const category = inferSoftwareCategory({
+    id: packageIdentifier,
     name: latest.Name || packageIdentifier,
+    publisher,
     description: originalDescription,
     tags: rawTags
   });
 
+  const largeOfficialCover = await getOfficialLargeCover(homepage);
+
   const coverUrl =
+    largeOfficialCover ||
+    packageInfo.Banner ||
     packageInfo.Logo ||
     packageInfo.IconUrl ||
-    packageInfo.Banner ||
     fallbackCoverUrl(homepage);
 
   const translatedChangelog = await translateToSpanish(
@@ -974,6 +1091,15 @@ async function buildProductFromIndexPackage(
       fetchedAt: new Date().toISOString(),
       manifestUrl: officialData?.manifestUrl || '',
       installerUrl: officialData?.installerUrl || '',
+      coverSource: largeOfficialCover
+        ? 'Sitio oficial'
+        : (
+            packageInfo.Banner ||
+            packageInfo.Logo ||
+            packageInfo.IconUrl
+              ? 'Índice WinGet'
+              : (coverUrl ? 'Favicon oficial' : '')
+          ),
       translatedWithDeepL: Boolean(
         deeplApiKey &&
         description &&
