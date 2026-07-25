@@ -1,0 +1,551 @@
+const GITHUB_API = 'https://api.github.com';
+const REPOSITORY = 'microsoft/winget-pkgs';
+
+function send(res, status, body){
+  res.status(status)
+    .setHeader('Content-Type', 'application/json; charset=utf-8')
+    .setHeader('Cache-Control', 'no-store')
+    .send(JSON.stringify(body));
+}
+
+function githubHeaders(token){
+  return {
+    'Accept': 'application/vnd.github+json',
+    'Authorization': `Bearer ${token}`,
+    'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': 'AREA51-Software-Catalog'
+  };
+}
+
+async function githubJson(path, token){
+  const response = await fetch(`${GITHUB_API}${path}`, {
+    headers: githubHeaders(token)
+  });
+
+  if(!response.ok){
+    const detail = await response.text().catch(() => '');
+    throw new Error(
+      `GitHub respondió ${response.status}${detail ? `: ${detail.slice(0,180)}` : ''}`
+    );
+  }
+
+  return response.json();
+}
+
+async function githubText(url, token){
+  const response = await fetch(url, {
+    headers: githubHeaders(token)
+  });
+
+  if(!response.ok){
+    throw new Error(`No se pudo leer el manifiesto (${response.status}).`);
+  }
+
+  return response.text();
+}
+
+function decodeYamlScalar(value=''){
+  const text = String(value).trim();
+
+  if(
+    (text.startsWith('"') && text.endsWith('"')) ||
+    (text.startsWith("'") && text.endsWith("'"))
+  ){
+    return text.slice(1, -1)
+      .replace(/\\"/g, '"')
+      .replace(/\\n/g, '\n')
+      .replace(/''/g, "'");
+  }
+
+  return text;
+}
+
+function parseSimpleYaml(yaml=''){
+  const result = {};
+  const lines = String(yaml).replace(/\r\n/g, '\n').split('\n');
+
+  let currentKey = '';
+  let currentIndent = -1;
+  let blockMode = '';
+  let blockLines = [];
+
+  function flushBlock(){
+    if(!currentKey) return;
+    result[currentKey] = blockLines.join('\n').trim();
+    currentKey = '';
+    currentIndent = -1;
+    blockMode = '';
+    blockLines = [];
+  }
+
+  for(const rawLine of lines){
+    const indent = rawLine.match(/^\s*/)?.[0].length || 0;
+    const trimmed = rawLine.trim();
+
+    if(!trimmed || trimmed.startsWith('#')){
+      if(blockMode && currentKey) blockLines.push('');
+      continue;
+    }
+
+    if(blockMode){
+      if(indent > currentIndent){
+        blockLines.push(rawLine.slice(Math.min(rawLine.length, currentIndent + 2)));
+        continue;
+      }
+      flushBlock();
+    }
+
+    const match = rawLine.match(/^(\s*)([A-Za-z][A-Za-z0-9]*):(?:\s*(.*))?$/);
+    if(!match) continue;
+
+    const key = match[2];
+    const value = match[3] ?? '';
+
+    if(value === '|' || value === '>-' || value === '>' || value === '|-'){
+      currentKey = key;
+      currentIndent = indent;
+      blockMode = value;
+      blockLines = [];
+      continue;
+    }
+
+    if(value !== ''){
+      result[key] = decodeYamlScalar(value);
+    }
+  }
+
+  flushBlock();
+  return result;
+}
+
+function parseYamlList(yaml='', key='Tags'){
+  const lines = String(yaml).replace(/\r\n/g, '\n').split('\n');
+  const output = [];
+  let inside = false;
+  let baseIndent = -1;
+
+  for(const rawLine of lines){
+    const indent = rawLine.match(/^\s*/)?.[0].length || 0;
+    const trimmed = rawLine.trim();
+
+    if(!inside){
+      if(new RegExp(`^${key}:\\s*$`).test(trimmed)){
+        inside = true;
+        baseIndent = indent;
+      }
+      continue;
+    }
+
+    if(trimmed && indent <= baseIndent && !trimmed.startsWith('-')){
+      break;
+    }
+
+    const item = trimmed.match(/^-\s*(.+)$/);
+    if(item) output.push(decodeYamlScalar(item[1]));
+  }
+
+  return output;
+}
+
+function normalizeText(value=''){
+  return String(value)
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function normalizeTitle(value=''){
+  return String(value)
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function compareVersions(a='', b=''){
+  const tokenize = value => String(value)
+    .replace(/^v/i, '')
+    .split(/[^0-9A-Za-z]+/)
+    .filter(Boolean)
+    .map(part => /^\d+$/.test(part) ? Number(part) : part.toLowerCase());
+
+  const left = tokenize(a);
+  const right = tokenize(b);
+  const length = Math.max(left.length, right.length);
+
+  for(let i = 0; i < length; i++){
+    const x = left[i] ?? 0;
+    const y = right[i] ?? 0;
+
+    if(typeof x === 'number' && typeof y === 'number'){
+      if(x !== y) return x > y ? 1 : -1;
+      continue;
+    }
+
+    const comparison = String(x).localeCompare(String(y), undefined, {
+      numeric: true,
+      sensitivity: 'base'
+    });
+
+    if(comparison !== 0) return comparison > 0 ? 1 : -1;
+  }
+
+  return 0;
+}
+
+function extractVersionFromPath(path=''){
+  const parts = String(path).split('/');
+  return parts.length >= 2 ? parts[parts.length - 2] : '';
+}
+
+function scoreSearchResult(item, query){
+  const data = item.data || {};
+  const wanted = normalizeTitle(query);
+  const name = normalizeTitle(data.PackageName || '');
+  const identifier = normalizeTitle(data.PackageIdentifier || '');
+
+  let score = 0;
+  if(name === wanted) score += 100;
+  if(identifier === wanted) score += 90;
+  if(name.startsWith(wanted)) score += 50;
+  if(identifier.includes(wanted)) score += 35;
+  if(name.includes(wanted)) score += 30;
+  if(/\.locale\.[a-z-]+\.yaml$/i.test(item.path)) score += 5;
+
+  return score;
+}
+
+async function searchManifests(query, token){
+  const encoded = encodeURIComponent(
+    `"${query}" repo:${REPOSITORY} path:manifests extension:yaml`
+  );
+
+  const search = await githubJson(
+    `/search/code?q=${encoded}&per_page=50`,
+    token
+  );
+
+  const candidates = [];
+
+  for(const item of search.items || []){
+    try{
+      const yaml = await githubText(item.url, token);
+      const data = parseSimpleYaml(yaml);
+
+      if(!data.PackageIdentifier || !data.PackageName) continue;
+
+      candidates.push({
+        path: item.path,
+        htmlUrl: item.html_url,
+        data,
+        version: data.PackageVersion || extractVersionFromPath(item.path)
+      });
+    }catch(error){
+      console.warn('No se pudo leer un resultado WinGet.', error.message);
+    }
+  }
+
+  const grouped = new Map();
+
+  for(const candidate of candidates){
+    const id = candidate.data.PackageIdentifier;
+    const existing = grouped.get(id);
+
+    if(
+      !existing ||
+      compareVersions(candidate.version, existing.version) > 0 ||
+      (
+        compareVersions(candidate.version, existing.version) === 0 &&
+        scoreSearchResult(candidate, query) > scoreSearchResult(existing, query)
+      )
+    ){
+      grouped.set(id, candidate);
+    }
+  }
+
+  return [...grouped.values()]
+    .sort((a, b) => {
+      const scoreDifference =
+        scoreSearchResult(b, query) - scoreSearchResult(a, query);
+
+      if(scoreDifference) return scoreDifference;
+      return String(a.data.PackageName).localeCompare(String(b.data.PackageName));
+    })
+    .slice(0, 8);
+}
+
+async function findPackageManifest(packageId, token){
+  const encoded = encodeURIComponent(
+    `"PackageIdentifier: ${packageId}" repo:${REPOSITORY} path:manifests extension:yaml`
+  );
+
+  const search = await githubJson(
+    `/search/code?q=${encoded}&per_page=50`,
+    token
+  );
+
+  const matches = [];
+
+  for(const item of search.items || []){
+    try{
+      const yaml = await githubText(item.url, token);
+      const data = parseSimpleYaml(yaml);
+
+      if(data.PackageIdentifier !== packageId) continue;
+
+      matches.push({
+        path: item.path,
+        htmlUrl: item.html_url,
+        yaml,
+        data,
+        version: data.PackageVersion || extractVersionFromPath(item.path)
+      });
+    }catch(error){
+      console.warn('No se pudo leer un manifiesto WinGet.', error.message);
+    }
+  }
+
+  if(!matches.length) return null;
+
+  matches.sort((a, b) => compareVersions(b.version, a.version));
+  const latestVersion = matches[0].version;
+  const latest = matches.filter(item => item.version === latestVersion);
+
+  const locale =
+    latest.find(item => /\.locale\.es(?:-[a-z]+)?\.yaml$/i.test(item.path)) ||
+    latest.find(item => /\.locale\.en-us\.yaml$/i.test(item.path)) ||
+    latest.find(item => /\.locale\.[a-z-]+\.yaml$/i.test(item.path)) ||
+    latest.find(item => !/\.installer\.yaml$/i.test(item.path));
+
+  const version =
+    latest.find(item => /\.yaml$/i.test(item.path) &&
+      !/\.locale\.[a-z-]+\.yaml$/i.test(item.path) &&
+      !/\.installer\.yaml$/i.test(item.path)) ||
+    locale ||
+    latest[0];
+
+  const installer =
+    latest.find(item => /\.installer\.yaml$/i.test(item.path)) ||
+    null;
+
+  return {
+    latestVersion,
+    locale,
+    version,
+    installer,
+    files: latest
+  };
+}
+
+function joinUnique(values){
+  return [...new Set(
+    values
+      .flatMap(value => Array.isArray(value) ? value : [value])
+      .map(value => String(value || '').trim())
+      .filter(Boolean)
+  )];
+}
+
+function inferLanguages(manifests){
+  const locales = manifests
+    .map(item => item?.PackageLocale)
+    .filter(Boolean)
+    .map(locale => {
+      const normalized = String(locale).toLowerCase();
+      if(normalized.startsWith('es')) return 'Español';
+      if(normalized.startsWith('en')) return 'Inglés';
+      if(normalized.startsWith('pt')) return 'Portugués';
+      if(normalized.startsWith('fr')) return 'Francés';
+      if(normalized.startsWith('de')) return 'Alemán';
+      if(normalized.startsWith('it')) return 'Italiano';
+      return locale;
+    });
+
+  return joinUnique(locales).join(', ');
+}
+
+function inferLegalBasis(data){
+  const license = `${data.License || ''} ${data.LicenseUrl || ''}`.toLowerCase();
+
+  if(
+    /mit|apache|gpl|gnu|mozilla public|bsd|open source|opensource/
+      .test(license)
+  ){
+    return 'dominio-publico';
+  }
+
+  if(/shareware|trial|prueba/.test(license)){
+    return 'shareware';
+  }
+
+  return 'freeware';
+}
+
+function buildProduct(packageData){
+  const localeData = packageData.locale?.data || {};
+  const versionData = packageData.version?.data || {};
+  const installerData = packageData.installer?.data || {};
+  const allData = [localeData, versionData, installerData];
+
+  const packageIdentifier =
+    localeData.PackageIdentifier ||
+    versionData.PackageIdentifier ||
+    installerData.PackageIdentifier ||
+    '';
+
+  const packageName =
+    localeData.PackageName ||
+    versionData.PackageName ||
+    installerData.PackageName ||
+    packageIdentifier;
+
+  const publisher =
+    localeData.Publisher ||
+    versionData.Publisher ||
+    installerData.Publisher ||
+    '';
+
+  const description = normalizeText(
+    localeData.Description ||
+    versionData.Description ||
+    localeData.ShortDescription ||
+    versionData.ShortDescription ||
+    ''
+  );
+
+  const tags = joinUnique([
+    parseYamlList(packageData.locale?.yaml || '', 'Tags'),
+    parseYamlList(packageData.version?.yaml || '', 'Tags'),
+    publisher
+  ]);
+
+  const homepage =
+    localeData.PackageUrl ||
+    versionData.PackageUrl ||
+    localeData.PublisherUrl ||
+    versionData.PublisherUrl ||
+    '';
+
+  const license =
+    localeData.License ||
+    versionData.License ||
+    '';
+
+  return {
+    wingetId: packageIdentifier,
+    name: packageName,
+    category: 'Software de PC',
+    status: 'ok',
+    legalBasis: inferLegalBasis({...versionData, ...localeData}),
+    description,
+    reqMin: '',
+    reqRec: '',
+    size: '',
+    version: packageData.latestVersion || versionData.PackageVersion || '',
+    languages: inferLanguages(allData),
+    tags: tags.slice(0, 12).join(', '),
+    coverUrl: '',
+    install: packageIdentifier
+      ? `Instalar desde WinGet: winget install --id ${packageIdentifier} --exact`
+      : '',
+    notes: [
+      publisher ? `Desarrollador/editor: ${publisher}.` : '',
+      license ? `Licencia informada por WinGet: ${license}.` : '',
+      homepage ? `Sitio oficial informado por WinGet: ${homepage}` : ''
+    ].filter(Boolean).join('\n'),
+    sourceUrl: homepage,
+    contentType: 'software',
+    updateMeta: {
+      wingetId: packageIdentifier,
+      fetchedAt: new Date().toISOString(),
+      manifestUrl:
+        packageData.locale?.htmlUrl ||
+        packageData.version?.htmlUrl ||
+        ''
+    },
+    source: 'WinGet'
+  };
+}
+
+module.exports = async function handler(req, res){
+  if(req.method !== 'GET'){
+    return send(res, 405, {error: 'Método no permitido'});
+  }
+
+  const githubToken = process.env.GITHUB_TOKEN || '';
+  if(!githubToken){
+    return send(res, 500, {
+      error: 'Falta configurar GITHUB_TOKEN en Vercel.'
+    });
+  }
+
+  const query = String(req.query.q || '').trim();
+  const id = String(req.query.id || '').trim();
+
+  if(!query && !id){
+    return send(res, 400, {error: 'Indicá q o id.'});
+  }
+
+  try{
+    if(query){
+      if(query.length < 2){
+        return send(res, 400, {
+          error: 'La búsqueda debe tener al menos dos caracteres.'
+        });
+      }
+
+      const manifests = await searchManifests(query, githubToken);
+
+      const results = manifests.map(item => ({
+        id: item.data.PackageIdentifier,
+        name: item.data.PackageName,
+        publisher: item.data.Publisher || '',
+        version: item.version || '',
+        description:
+          item.data.ShortDescription ||
+          item.data.Description ||
+          '',
+        contentType: 'software',
+        source: 'WinGet'
+      }));
+
+      return send(res, 200, {
+        results,
+        provider: 'WinGet'
+      });
+    }
+
+    const packageData = await findPackageManifest(id, githubToken);
+
+    if(!packageData){
+      return send(res, 404, {
+        error: 'Software no encontrado en WinGet.'
+      });
+    }
+
+    return send(res, 200, {
+      product: buildProduct(packageData)
+    });
+  }catch(error){
+    console.error(error);
+
+    const message = String(error?.message || '');
+
+    if(message.includes('403')){
+      return send(res, 502, {
+        error: 'GitHub rechazó la consulta. Revisá GITHUB_TOKEN y sus límites.'
+      });
+    }
+
+    if(message.includes('422')){
+      return send(res, 502, {
+        error: 'GitHub no pudo procesar la búsqueda de WinGet.'
+      });
+    }
+
+    return send(res, 500, {
+      error: `No se pudo consultar WinGet: ${message || 'Error desconocido'}`
+    });
+  }
+};
