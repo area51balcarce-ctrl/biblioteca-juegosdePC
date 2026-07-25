@@ -181,12 +181,12 @@
         <div class="smart-box">
           <div class="smart-row">
             <div class="field" style="margin:0">
-              <label for="smart-query">Nombre del juego</label>
-              <input type="text" id="smart-query" placeholder="Ej: Pro Evolution Soccer 2016" autocomplete="off">
+              <label for="smart-query">Nombre del producto</label>
+              <input type="text" id="smart-query" placeholder="Ej: Pro Evolution Soccer 2016 o VLC" autocomplete="off">
             </div>
             <button type="button" class="btn btn-primary" id="smart-search-btn">Buscar y completar</button>
           </div>
-          <div class="hint">Busca la ficha, requisitos, idiomas y portada. Todo queda editable antes de guardar.</div>
+          <div class="hint">Busca juegos en IGDB y software en WinGet. Los resultados aparecen separados y todo queda editable antes de guardar.</div>
           <div class="smart-status" id="smart-status"></div>
           <div class="search-results" id="search-results"></div>
         </div>
@@ -893,47 +893,141 @@
     document.getElementById('update-results').replaceChildren();
   }
 
-  function renderSearchResults(results){
+  function createSearchGroupTitle(label){
+    const title = document.createElement('div');
+    title.className = 'hint';
+    title.style.margin = '14px 0 6px';
+    title.style.fontWeight = '700';
+    title.textContent = label;
+    return title;
+  }
+
+  function renderSearchResults({games=[], software=[]}){
     const box = document.getElementById('search-results');
     box.replaceChildren();
-    results.forEach(game => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'search-result';
-      const img = document.createElement('img');
-      img.alt = '';
-      if(game.coverUrl) img.src = game.coverUrl;
-      const text = document.createElement('span');
-      const title = document.createElement('strong');
-      title.textContent = game.name;
-      const meta = document.createElement('small');
-      const details = [game.released, ...(game.genres || []).slice(0,2), (game.platforms || []).includes('PC') ? 'PC' : ''].filter(Boolean);
-      meta.textContent = details.join(' · ');
-      text.append(title,meta);
-      const pick = document.createElement('span');
-      pick.className = 'pick';
-      pick.textContent = 'USAR →';
-      button.append(img,text,pick);
-      button.addEventListener('click', () => loadSmartProduct(game.id));
-      box.append(button);
-    });
+
+    if(games.length){
+      box.append(createSearchGroupTitle('JUEGOS — IGDB'));
+      games.forEach(game => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'search-result';
+
+        const img = document.createElement('img');
+        img.alt = '';
+        if(game.coverUrl) img.src = game.coverUrl;
+
+        const resultText = document.createElement('span');
+        const title = document.createElement('strong');
+        title.textContent = game.name;
+
+        const meta = document.createElement('small');
+        const details = [
+          game.released,
+          ...(game.genres || []).slice(0,2),
+          (game.platforms || []).includes('PC') ? 'PC' : ''
+        ].filter(Boolean);
+        meta.textContent = details.join(' · ');
+
+        resultText.append(title, meta);
+
+        const pick = document.createElement('span');
+        pick.className = 'pick';
+        pick.textContent = 'USAR →';
+
+        button.append(img, resultText, pick);
+        button.addEventListener('click', () => loadSmartProduct(game.id, 'game'));
+        box.append(button);
+      });
+    }
+
+    if(software.length){
+      box.append(createSearchGroupTitle('SOFTWARE — WINGET'));
+      software.forEach(program => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'search-result';
+
+        const img = document.createElement('img');
+        img.alt = '';
+        if(program.coverUrl) img.src = program.coverUrl;
+
+        const resultText = document.createElement('span');
+        const title = document.createElement('strong');
+        title.textContent = program.name;
+
+        const meta = document.createElement('small');
+        meta.textContent = [
+          program.publisher,
+          program.version,
+          'Software de PC'
+        ].filter(Boolean).join(' · ');
+
+        resultText.append(title, meta);
+
+        const pick = document.createElement('span');
+        pick.className = 'pick';
+        pick.textContent = 'USAR →';
+
+        button.append(img, resultText, pick);
+        button.addEventListener('click', () => loadSmartProduct(program.id, 'software'));
+        box.append(button);
+      });
+    }
   }
 
   async function searchSmartProduct(){
     const query = document.getElementById('smart-query').value.trim();
-    if(query.length < 2){ setSmartStatus('Escribí al menos dos caracteres.','error'); return; }
+    if(query.length < 2){
+      setSmartStatus('Escribí al menos dos caracteres.','error');
+      return;
+    }
+
     const btn = document.getElementById('smart-search-btn');
     btn.disabled = true;
     btn.textContent = 'Buscando…';
-    setSmartStatus('Consultando catálogo…');
+    setSmartStatus('Consultando IGDB y WinGet…');
     document.getElementById('search-results').replaceChildren();
+
     try{
-      const response = await fetch(`/api/igdb-data-v2?q=${encodeURIComponent(query)}`);
-      const data = await response.json();
-      if(!response.ok) throw new Error(data.error || 'No se pudo buscar.');
-      if(!data.results?.length){ setSmartStatus('No encontré coincidencias. Podés completar el formulario manualmente.','error'); return; }
-      renderSearchResults(data.results);
-      setSmartStatus('Elegí el resultado correcto.','ok');
+      const [gameResult, softwareResult] = await Promise.allSettled([
+        fetch(`/api/igdb-data-v2?q=${encodeURIComponent(query)}`)
+          .then(async response => {
+            const data = await response.json();
+            if(!response.ok) throw new Error(data.error || 'IGDB no pudo buscar.');
+            return data.results || [];
+          }),
+        fetch(`/api/software-data?q=${encodeURIComponent(query)}`)
+          .then(async response => {
+            const data = await response.json();
+            if(!response.ok) throw new Error(data.error || 'WinGet no pudo buscar.');
+            return data.results || [];
+          })
+      ]);
+
+      const games = gameResult.status === 'fulfilled' ? gameResult.value : [];
+      const software = softwareResult.status === 'fulfilled' ? softwareResult.value : [];
+
+      if(!games.length && !software.length){
+        const errors = [
+          gameResult.status === 'rejected' ? gameResult.reason?.message : '',
+          softwareResult.status === 'rejected' ? softwareResult.reason?.message : ''
+        ].filter(Boolean);
+
+        setSmartStatus(
+          errors[0] || 'No encontré coincidencias. Podés completar el formulario manualmente.',
+          'error'
+        );
+        return;
+      }
+
+      renderSearchResults({games, software});
+
+      if(gameResult.status === 'rejected' || softwareResult.status === 'rejected'){
+        setSmartStatus('Mostré los resultados disponibles. Una de las fuentes no respondió.','error');
+      }else{
+        setSmartStatus('Elegí el resultado correcto en Juegos o Software.','ok');
+      }
     }catch(error){
       setSmartStatus(error.message || 'Falló la búsqueda.','error');
     }finally{
@@ -961,32 +1055,54 @@
     }
   }
 
-  async function loadSmartProduct(id){
+  async function loadSmartProduct(id, type='game'){
     setSmartStatus('Completando la ficha técnica…');
     document.getElementById('search-results').replaceChildren();
+
     try{
-      const response = await fetch(`/api/igdb-data-v2?id=${encodeURIComponent(id)}`);
+      const endpoint = type === 'software'
+        ? `/api/software-data?id=${encodeURIComponent(id)}`
+        : `/api/igdb-data-v2?id=${encodeURIComponent(id)}`;
+
+      const response = await fetch(endpoint);
       const data = await response.json();
       if(!response.ok) throw new Error(data.error || 'No se pudo cargar la ficha.');
+
       const product = data.product || {};
-      setValue('name',product.name);
+
+      setValue('name', product.name);
+
       if(!slugTouched){
-        setValue('slug',a51_slugify(product.name || ''));
-        document.getElementById('slug-preview').textContent = document.getElementById('slug').value || '…';
+        setValue('slug', a51_slugify(product.name || ''));
+        document.getElementById('slug-preview').textContent =
+          document.getElementById('slug').value || '…';
       }
-      setValue('category',product.category || 'Juego de PC');
-      setValue('status',product.status || 'ok');
-      setValue('legalBasis',product.legalBasis || 'propio');
-      setValue('description',product.description);
-      setValue('reqMin',product.reqMin);
-      setValue('reqRec',product.reqRec);
-      setValue('size',product.size);
-      setValue('version',product.version);
-      setValue('languages',product.languages || 'Español, Inglés');
-      setValue('tags',product.tags);
-      await searchGameTrailer(product.name);
-      await downloadAutomaticCover(product.coverUrl, product.name);
-      setSmartStatus(`Ficha completada desde ${product.source || 'catálogo externo'}. Revisala y subí el archivo principal.`, 'ok');
+
+      setValue('category', product.category || (type === 'software' ? 'Software de PC' : 'Juego de PC'));
+      setValue('status', product.status || 'ok');
+      setValue('legalBasis', product.legalBasis || (type === 'software' ? 'freeware' : 'propio'));
+      setValue('description', product.description);
+      setValue('reqMin', product.reqMin);
+      setValue('reqRec', product.reqRec);
+      setValue('size', product.size);
+      setValue('version', product.version);
+      setValue('languages', product.languages || (type === 'game' ? 'Español, Inglés' : ''));
+      setValue('tags', product.tags);
+      setValue('install', product.install);
+      setValue('notes', product.notes);
+
+      if(type === 'game'){
+        await searchGameTrailer(product.name);
+      }
+
+      if(product.coverUrl){
+        await downloadAutomaticCover(product.coverUrl, product.name);
+      }
+
+      setSmartStatus(
+        `Ficha completada desde ${product.source || 'catálogo externo'}. Revisala y subí el archivo principal.`,
+        'ok'
+      );
     }catch(error){
       setSmartStatus(error.message || 'No se pudo completar la ficha.','error');
     }
