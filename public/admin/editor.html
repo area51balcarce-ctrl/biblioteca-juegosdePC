@@ -277,7 +277,7 @@
         </div>
         <div class="field"><label for="install">Instrucciones de instalación</label><textarea id="install"></textarea></div>
         <div class="field"><label for="notes">Notas importantes</label><textarea id="notes"></textarea></div>
-        <div class="field"><label for="changelog">Changelog (una línea por entrada)</label><textarea id="changelog" placeholder="2026-06-02 — Descripción del cambio"></textarea></div>
+        <div class="field"><label for="changelog">Changelog (una línea por entrada)</label><textarea id="changelog" placeholder="Sin changelog oficial disponible"></textarea></div>
         <div class="grid-2">
           <div class="field"><label for="tags">Etiquetas (separadas por coma)</label><input type="text" id="tags"></div>
           <div class="field"><label for="dlc">Contenido adicional incluido</label><input type="text" id="dlc"></div>
@@ -376,6 +376,46 @@
   function setValueExact(id, value){
     const el = document.getElementById(id);
     if(el) el.value = value === undefined || value === null ? '' : value;
+  }
+
+  function updateOptionalField(id, value, emptyPlaceholder=''){
+    const el = document.getElementById(id);
+    if(!el) return;
+
+    const cleanValue =
+      value === undefined || value === null
+        ? ''
+        : String(value).trim();
+
+    el.value = cleanValue;
+    if(emptyPlaceholder) el.placeholder = cleanValue ? '' : emptyPlaceholder;
+  }
+
+  function clearAutomaticCover(){
+    autoCoverUrl = '';
+    autoCoverFile = null;
+
+    const preview = document.getElementById('cover-preview');
+    preview.removeAttribute('src');
+    preview.classList.remove('show');
+
+    markFile('cover', 'sin archivo');
+  }
+
+  function getCoverCandidates(product={}){
+    const values = [
+      product.largeCoverUrl,
+      ...(Array.isArray(product.coverCandidates) ? product.coverCandidates : []),
+      product.coverUrl,
+      product.logoUrl,
+      product.iconUrl
+    ];
+
+    return [...new Set(
+      values
+        .map(value => String(value || '').trim())
+        .filter(Boolean)
+    )];
   }
 
   const DOWNLOAD_TYPES = [
@@ -1041,28 +1081,63 @@
     }
   }
 
-  async function downloadAutomaticCover(url, name){
-    if(!url) return;
-    autoCoverUrl = url;
-    const preview = document.getElementById('cover-preview');
-    preview.src = url;
-    preview.classList.add('show');
-    markFile('cover','portada automática');
-    try{
-      const response = await fetch(`/api/image-proxy?url=${encodeURIComponent(url)}`);
-      if(!response.ok) throw new Error('No se pudo preparar la portada.');
-      const blob = await response.blob();
-      const ext = blob.type.includes('png') ? 'png' : blob.type.includes('webp') ? 'webp' : 'jpg';
-      autoCoverFile = new File([blob], `${a51_slugify(name || 'portada')}.${ext}`, {type:blob.type || 'image/jpeg'});
-    }catch(error){
-      autoCoverFile = null;
-      setSmartStatus('La ficha se completó, pero la portada automática no pudo prepararse. Podés subirla manualmente.','error');
+  async function downloadAutomaticCover(candidates, name){
+    const urls = Array.isArray(candidates)
+      ? candidates.filter(Boolean)
+      : [candidates].filter(Boolean);
+
+    if(!urls.length){
+      clearAutomaticCover();
+      return;
     }
+
+    clearAutomaticCover();
+
+    for(const url of urls){
+      try{
+        const response = await fetch(
+          `/api/image-proxy?url=${encodeURIComponent(url)}`
+        );
+
+        if(!response.ok) continue;
+
+        const blob = await response.blob();
+        if(!blob.type.startsWith('image/')) continue;
+
+        const ext =
+          blob.type.includes('png') ? 'png' :
+          blob.type.includes('webp') ? 'webp' :
+          blob.type.includes('svg') ? 'svg' :
+          'jpg';
+
+        autoCoverUrl = url;
+        autoCoverFile = new File(
+          [blob],
+          `${a51_slugify(name || 'portada')}.${ext}`,
+          {type: blob.type || 'image/jpeg'}
+        );
+
+        const preview = document.getElementById('cover-preview');
+        preview.src = URL.createObjectURL(blob);
+        preview.classList.add('show');
+        markFile('cover', 'portada automática');
+        return;
+      }catch(error){
+        console.warn('No se pudo preparar una portada automática.', error);
+      }
+    }
+
+    clearAutomaticCover();
+    setSmartStatus(
+      'La ficha se completó, pero ninguna portada automática pudo prepararse. Podés subirla manualmente.',
+      'error'
+    );
   }
 
   async function loadSmartProduct(id, type='game'){
     setSmartStatus('Completando la ficha técnica…');
     document.getElementById('search-results').replaceChildren();
+    clearAutomaticCover();
 
     try{
       const endpoint = type === 'software'
@@ -1088,7 +1163,13 @@
       setValue('legalBasis', product.legalBasis || (type === 'software' ? 'freeware' : 'propio'));
       setValueExact('description', product.description);
       setValueExact('reqMin', product.reqMin);
-      setValueExact('reqRec', product.reqRec);
+      updateOptionalField(
+        'reqRec',
+        product.reqRec,
+        type === 'software'
+          ? 'Sin requisitos recomendados oficiales disponibles'
+          : ''
+      );
       setValueExact('size', product.size);
       setValueExact('version', product.version);
       setValueExact(
@@ -1098,7 +1179,11 @@
       setValueExact('tags', product.tags);
       setValueExact('install', product.install);
       setValueExact('notes', product.notes);
-      setValueExact('changelog', product.changelog);
+      updateOptionalField(
+        'changelog',
+        product.changelog,
+        'Sin changelog oficial disponible'
+      );
 
       if(type === 'game'){
         await searchGameTrailer(product.name);
@@ -1110,8 +1195,9 @@
         trailerStatus.className = 'trailer-status';
       }
 
-      if(product.coverUrl){
-        await downloadAutomaticCover(product.coverUrl, product.name);
+      const coverCandidates = getCoverCandidates(product);
+      if(coverCandidates.length){
+        await downloadAutomaticCover(coverCandidates, product.name);
       }
 
       setSmartStatus(
