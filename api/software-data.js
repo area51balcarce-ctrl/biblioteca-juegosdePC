@@ -297,6 +297,156 @@ function inferSoftwareCategory({
   return 'Software de PC';
 }
 
+
+function decodeHtmlEntities(value=''){
+  return String(value)
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .trim();
+}
+
+function absoluteUrl(value='', base=''){
+  try{
+    return new URL(decodeHtmlEntities(value), base).toString();
+  }catch{
+    return '';
+  }
+}
+
+function extractMetaContent(html='', key=''){
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const patterns = [
+    new RegExp(`<meta[^>]+property=["']${escaped}["'][^>]+content=["']([^"']+)["']`, 'i'),
+    new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${escaped}["']`, 'i'),
+    new RegExp(`<meta[^>]+name=["']${escaped}["'][^>]+content=["']([^"']+)["']`, 'i'),
+    new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+name=["']${escaped}["']`, 'i')
+  ];
+
+  for(const pattern of patterns){
+    const match = String(html).match(pattern);
+    if(match?.[1]) return decodeHtmlEntities(match[1]);
+  }
+
+  return '';
+}
+
+function extractLinkHref(html='', relValue=''){
+  const escaped = relValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const patterns = [
+    new RegExp(`<link[^>]+rel=["'][^"']*${escaped}[^"']*["'][^>]+href=["']([^"']+)["']`, 'i'),
+    new RegExp(`<link[^>]+href=["']([^"']+)["'][^>]+rel=["'][^"']*${escaped}[^"']*["']`, 'i')
+  ];
+
+  for(const pattern of patterns){
+    const match = String(html).match(pattern);
+    if(match?.[1]) return decodeHtmlEntities(match[1]);
+  }
+
+  return '';
+}
+
+async function fetchHomepageMetadata(homepage=''){
+  if(!homepage) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6500);
+
+  try{
+    const response = await fetch(homepage, {
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: {
+        'Accept': 'text/html,application/xhtml+xml',
+        'User-Agent': 'Mozilla/5.0 AREA51-Software-Catalog'
+      }
+    });
+
+    if(!response.ok) return null;
+
+    const contentType = response.headers.get('content-type') || '';
+    if(!contentType.includes('text/html')) return null;
+
+    const html = await response.text();
+    const finalUrl = response.url || homepage;
+
+    const imageCandidates = [
+      extractMetaContent(html, 'og:image:secure_url'),
+      extractMetaContent(html, 'og:image'),
+      extractMetaContent(html, 'twitter:image'),
+      extractMetaContent(html, 'twitter:image:src'),
+      extractLinkHref(html, 'apple-touch-icon'),
+      extractLinkHref(html, 'icon')
+    ]
+      .map(value => absoluteUrl(value, finalUrl))
+      .filter(Boolean);
+
+    return {
+      finalUrl,
+      imageCandidates: [...new Set(imageCandidates)],
+      description:
+        extractMetaContent(html, 'og:description') ||
+        extractMetaContent(html, 'twitter:description') ||
+        extractMetaContent(html, 'description') ||
+        ''
+    };
+  }catch(error){
+    console.warn('No se pudieron leer metadatos del sitio oficial.', error.message);
+    return null;
+  }finally{
+    clearTimeout(timeout);
+  }
+}
+
+function officialRecommendedRequirements(packageId='', name=''){
+  const id = String(packageId).toLowerCase();
+  const title = normalizeTitle(name);
+
+  const known = new Map([
+    ['obsproject.obsstudio', [
+      'Windows 10 u 11 de 64 bits',
+      'Procesador Intel Core i5 o AMD Ryzen 5 equivalente',
+      '8 GB de RAM',
+      'GPU compatible con DirectX 11'
+    ].join('\\n')],
+    ['blenderfoundation.blender', [
+      'Windows 10 u 11 de 64 bits',
+      'Procesador de 8 núcleos',
+      '32 GB de RAM',
+      'GPU con 8 GB de VRAM compatible con OpenGL 4.3'
+    ].join('\\n')],
+    ['microsoft.visualstudiocode', [
+      'Windows 10 u 11 de 64 bits',
+      'Procesador de 1,6 GHz o superior',
+      '4 GB de RAM',
+      'SSD recomendado'
+    ].join('\\n')],
+    ['videolan.vlc', [
+      'Windows 10 u 11',
+      'Procesador de doble núcleo',
+      '2 GB de RAM',
+      '100 MB de espacio disponible'
+    ].join('\\n')],
+    ['discord.discord', [
+      'Windows 10 u 11 de 64 bits',
+      'Procesador de doble núcleo',
+      '4 GB de RAM',
+      'Conexión a Internet estable'
+    ].join('\\n')]
+  ]);
+
+  if(known.has(id)) return known.get(id);
+  if(/\bobs studio\b/.test(title)) return known.get('obsproject.obsstudio');
+  if(/\bblender\b/.test(title)) return known.get('blenderfoundation.blender');
+  if(/\bvisual studio code\b|\bvs code\b/.test(title)) return known.get('microsoft.visualstudiocode');
+  if(/\bvlc\b/.test(title)) return known.get('videolan.vlc');
+  if(/\bdiscord\b/.test(title)) return known.get('discord.discord');
+
+  return '';
+}
+
 function fallbackCoverUrl(homepage=''){
   try{
     const url = new URL(homepage);
@@ -1013,8 +1163,15 @@ async function buildProductFromIndexPackage(
   const rawTags = Array.isArray(latest.Tags) ? latest.Tags : [];
   const tags = joinUnique([rawTags, publisher]);
   const originalDescription = normalizeText(latest.Description || '');
+
+  const homepageMetadata = await fetchHomepageMetadata(homepage);
+
+  const descriptionSource =
+    originalDescription ||
+    normalizeText(homepageMetadata?.description || '');
+
   const description = await translateToSpanish(
-    originalDescription,
+    descriptionSource,
     deeplApiKey
   );
 
@@ -1022,23 +1179,30 @@ async function buildProductFromIndexPackage(
     id: packageIdentifier,
     name: latest.Name || packageIdentifier,
     publisher,
-    description: originalDescription,
+    description: descriptionSource,
     tags: rawTags
   });
 
-  const largeOfficialCover = await getOfficialLargeCover(homepage);
+  const coverCandidates = joinUnique([
+    homepageMetadata?.imageCandidates || [],
+    packageInfo.Banner || '',
+    packageInfo.Logo || '',
+    packageInfo.IconUrl || '',
+    fallbackCoverUrl(homepage)
+  ]);
 
-  const coverUrl =
-    largeOfficialCover ||
-    packageInfo.Banner ||
-    packageInfo.Logo ||
-    packageInfo.IconUrl ||
-    fallbackCoverUrl(homepage);
-
+  const largeCoverUrl = coverCandidates[0] || '';
   const translatedChangelog = await translateToSpanish(
     officialData?.changelog || '',
     deeplApiKey
   );
+
+  const reqRec =
+    officialData?.reqRec ||
+    officialRecommendedRequirements(
+      packageIdentifier,
+      latest.Name || packageIdentifier
+    );
 
   return {
     wingetId: packageIdentifier,
@@ -1051,12 +1215,15 @@ async function buildProductFromIndexPackage(
     }),
     description,
     reqMin: officialData?.reqMin || '',
-    reqRec: officialData?.reqRec || '',
+    reqRec,
+    recommendedRequirements: reqRec,
     size: officialData?.size || '',
     version,
     languages: officialData?.languages || '',
     tags: tags.slice(0, 12).join(', '),
-    coverUrl,
+    coverUrl: largeCoverUrl,
+    largeCoverUrl,
+    coverCandidates,
     install: packageIdentifier
       ? `Instalar desde WinGet: winget install --id ${packageIdentifier} --exact`
       : '',
@@ -1067,13 +1234,13 @@ async function buildProductFromIndexPackage(
       officialData?.releaseNotesUrl
         ? `Notas oficiales de la versión: ${officialData.releaseNotesUrl}`
         : '',
-      !coverUrl
-        ? 'WinGet no informó una imagen oficial para este software.'
+      !largeCoverUrl
+        ? 'No se encontró una imagen oficial verificable para este software.'
         : '',
       !officialData?.reqMin
         ? 'La fuente no informó requisitos mínimos verificables.'
         : '',
-      !officialData?.reqRec
+      !reqRec
         ? 'La fuente no informó requisitos recomendados verificables.'
         : '',
       !officialData?.size
@@ -1084,34 +1251,27 @@ async function buildProductFromIndexPackage(
         : ''
     ].filter(Boolean).join('\n'),
     changelog: translatedChangelog,
-    sourceUrl: homepage,
+    sourceUrl: homepageMetadata?.finalUrl || homepage,
     contentType: 'software',
     updateMeta: {
       wingetId: packageIdentifier,
       fetchedAt: new Date().toISOString(),
       manifestUrl: officialData?.manifestUrl || '',
       installerUrl: officialData?.installerUrl || '',
-      coverSource: largeOfficialCover
-        ? 'Sitio oficial'
-        : (
-            packageInfo.Banner ||
-            packageInfo.Logo ||
-            packageInfo.IconUrl
-              ? 'Índice WinGet'
-              : (coverUrl ? 'Favicon oficial' : '')
-          ),
+      homepageMetadataFound: Boolean(homepageMetadata),
       translatedWithDeepL: Boolean(
         deeplApiKey &&
         description &&
-        description !== originalDescription
+        description !== descriptionSource
       )
     },
     source: [
       'WinGet',
       officialData ? 'Manifiesto oficial' : '',
+      homepageMetadata ? 'Sitio oficial' : '',
       deeplApiKey &&
       (
-        description !== originalDescription ||
+        description !== descriptionSource ||
         translatedChangelog !== (officialData?.changelog || '')
       )
         ? 'DeepL'
