@@ -38,7 +38,44 @@ async function githubText(url, token){
   });
 
   if(!response.ok){
-    throw new Error(`No se pudo leer el manifiesto (${response.status}).`);
+    const detail = await response.text().catch(() => '');
+    throw new Error(
+      `No se pudo leer el manifiesto (${response.status})${detail ? `: ${detail.slice(0,180)}` : ''}`
+    );
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+
+  // Los resultados de Search Code apuntan a un endpoint JSON de GitHub,
+  // no directamente al contenido YAML.
+  if(contentType.includes('application/json')){
+    const json = await response.json();
+
+    if(json.content && json.encoding === 'base64'){
+      return Buffer.from(
+        String(json.content).replace(/\n/g, ''),
+        'base64'
+      ).toString('utf8');
+    }
+
+    if(json.download_url){
+      const rawResponse = await fetch(json.download_url, {
+        headers: {
+          'Accept': 'text/plain',
+          'User-Agent': 'AREA51-Software-Catalog'
+        }
+      });
+
+      if(!rawResponse.ok){
+        throw new Error(
+          `No se pudo descargar el manifiesto (${rawResponse.status}).`
+        );
+      }
+
+      return rawResponse.text();
+    }
+
+    throw new Error('GitHub no devolvió el contenido del manifiesto.');
   }
 
   return response.text();
