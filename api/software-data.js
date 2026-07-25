@@ -519,6 +519,72 @@ function inferLegalBasis(data){
   return 'freeware';
 }
 
+
+function splitPackageIdentifier(packageId=''){
+  const parts = String(packageId).split('.').filter(Boolean);
+  if(parts.length < 2) return null;
+
+  return {
+    publisher: parts.shift(),
+    packageName: parts.join('.')
+  };
+}
+
+function buildProductFromIndexPackage(packageInfo={}){
+  const latest = packageInfo.Latest || {};
+  const packageIdentifier = packageInfo.Id || '';
+  const version =
+    Array.isArray(packageInfo.Versions) && packageInfo.Versions.length
+      ? packageInfo.Versions[0]
+      : '';
+
+  const publisher = latest.Publisher || '';
+  const license = latest.License || '';
+  const homepage = latest.Homepage || '';
+  const tags = joinUnique([
+    Array.isArray(latest.Tags) ? latest.Tags : [],
+    publisher
+  ]);
+
+  return {
+    wingetId: packageIdentifier,
+    name: latest.Name || packageIdentifier,
+    category: 'Software de PC',
+    status: 'ok',
+    legalBasis: inferLegalBasis({
+      License: license,
+      LicenseUrl: latest.LicenseUrl || ''
+    }),
+    description: normalizeText(latest.Description || ''),
+    reqMin: '',
+    reqRec: '',
+    size: '',
+    version,
+    languages: '',
+    tags: tags.slice(0, 12).join(', '),
+    coverUrl:
+      packageInfo.Logo ||
+      packageInfo.IconUrl ||
+      packageInfo.Banner ||
+      '',
+    install: packageIdentifier
+      ? `Instalar desde WinGet: winget install --id ${packageIdentifier} --exact`
+      : '',
+    notes: [
+      publisher ? `Desarrollador/editor: ${publisher}.` : '',
+      license ? `Licencia informada por WinGet: ${license}.` : '',
+      homepage ? `Sitio oficial informado por WinGet: ${homepage}` : ''
+    ].filter(Boolean).join('\n'),
+    sourceUrl: homepage,
+    contentType: 'software',
+    updateMeta: {
+      wingetId: packageIdentifier,
+      fetchedAt: new Date().toISOString()
+    },
+    source: 'WinGet'
+  };
+}
+
 function buildProduct(packageData){
   const localeData = packageData.locale?.data || {};
   const versionData = packageData.version?.data || {};
@@ -654,17 +720,39 @@ module.exports = async function handler(req, res){
       });
     }
 
-    const packageData = await findPackageManifest(id, githubToken);
+    const packageParts = splitPackageIdentifier(id);
 
-    if(!packageData){
-      return send(res, 404, {
-        error: 'Software no encontrado en WinGet.'
+    if(!packageParts){
+      return send(res, 400, {
+        error: 'El identificador de WinGet no es válido.'
       });
     }
 
-    return send(res, 200, {
-      product: buildProduct(packageData)
-    });
+    try{
+      const packageResponse = await wingetIndexJson(
+        `/packages/${encodeURIComponent(packageParts.publisher)}/${encodeURIComponent(packageParts.packageName)}`
+      );
+
+      const packageInfo = packageResponse?.Package || null;
+
+      if(!packageInfo){
+        return send(res, 404, {
+          error: 'Software no encontrado en WinGet.'
+        });
+      }
+
+      return send(res, 200, {
+        product: buildProductFromIndexPackage(packageInfo)
+      });
+    }catch(indexError){
+      if(String(indexError.message).includes('404')){
+        return send(res, 404, {
+          error: 'Software no encontrado en WinGet.'
+        });
+      }
+
+      throw indexError;
+    }
   }catch(error){
     console.error(error);
 
