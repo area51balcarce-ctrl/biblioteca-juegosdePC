@@ -256,20 +256,30 @@ function inferSoftwareCategory({name='', description='', tags=[]}={}){
   ].join(' '));
 
   const rules = [
-    ['Navegadores', /\b(browser|navegador|chrome|firefox|edge|brave|opera)\b/],
-    ['Multimedia', /\b(multimedia|media player|video player|audio player|codec|vlc|music|video|audio)\b/],
-    ['Streaming y grabación', /\b(streaming|stream|broadcast|recording|screen recorder|obs)\b/],
-    ['Diseño gráfico', /\b(design|graphic|photo|image editor|illustration|photoshop|gimp|drawing)\b/],
-    ['Edición de video', /\b(video editor|editing video|editor de video|davinci|premiere)\b/],
-    ['Audio', /\b(audio editor|music production|daw|sound editor|audacity)\b/],
-    ['Ofimática', /\b(office|spreadsheet|word processor|document editor|pdf|libreoffice)\b/],
-    ['Programación', /\b(developer|development|programming|code editor|ide|compiler|github|visual studio)\b/],
-    ['Compresión', /\b(archive|archiver|compression|zip|rar|7 zip|7zip|winrar)\b/],
-    ['Seguridad', /\b(antivirus|security|firewall|malware|password manager|vpn)\b/],
-    ['Comunicación', /\b(chat|messaging|communication|discord|telegram|whatsapp|meeting|conference)\b/],
-    ['Utilidades', /\b(utility|utilities|system tool|maintenance|cleanup|monitoring|backup|driver)\b/],
-    ['Descargas', /\b(download manager|torrent|bittorrent|download)\b/],
-    ['Juegos y plataformas', /\b(game launcher|gaming platform|steam|epic games|gog galaxy)\b/]
+    ['Navegadores', /(browser|navegador|chrome|firefox|edge|brave|opera|vivaldi|tor browser)/],
+    ['Multimedia', /(multimedia|media player|video player|audio player|codec|vlc|playback|dvd|blu ray|streaming media)/],
+    ['Audio', /(audio editor|music production|daw|sound editor|audacity|foobar|equalizer|mixer|podcast|music player)/],
+    ['Edición de video', /(video editor|video editing|editor de video|davinci|premiere|shotcut|kdenlive|openshot|handbrake)/],
+    ['Streaming y grabación', /(streaming|stream|broadcast|recording|screen recorder|screen capture|obs|capture card)/],
+    ['Diseño gráfico', /(design|graphic|graphics|photo editor|image editor|illustration|photoshop|gimp|krita|drawing|vector)/],
+    ['Modelado 3D y CAD', /(3d|modeling|modelling|cad|autocad|blender|sketchup|solidworks|freecad)/],
+    ['Ofimática', /(office|spreadsheet|word processor|document editor|presentation|pdf|libreoffice|onlyoffice|notepad)/],
+    ['Programación', /(developer|development|programming|code editor|ide|compiler|github|gitlab|visual studio|vscode|sdk|terminal)/],
+    ['Bases de datos', /(database|sql|mysql|postgres|sqlite|mongodb|dbeaver|phpmyadmin)/],
+    ['Inteligencia artificial', /(artificial intelligence|machine learning|ai tool|chatbot|llm|stable diffusion|ollama|comfyui)/],
+    ['Compresión', /(archive|archiver|compression|compressor|zip|rar|7 zip|7zip|winrar|peazip)/],
+    ['Seguridad', /(antivirus|security|firewall|malware|password manager|vpn|encryption|privacy|authenticator)/],
+    ['Comunicación', /(chat|messaging|communication|discord|telegram|whatsapp|meeting|conference|zoom|teams|slack)/],
+    ['Redes e Internet', /(network|networking|wifi|wi fi|lan|remote desktop|ftp|ssh|dns|proxy|internet tool)/],
+    ['Descargas', /(download manager|torrent|bittorrent|download|jdownloader|qbittorrent)/],
+    ['Copias de seguridad', /(backup|restore|recovery|disk image|clone|sync|synchronization)/],
+    ['Mantenimiento y sistema', /(utility|utilities|system tool|maintenance|cleanup|optimizer|monitoring|driver|benchmark|hardware info)/],
+    ['Virtualización', /(virtualization|virtual machine|vmware|virtualbox|hyper v|emulator|emulation)/],
+    ['Emulación', /(emulator|emulation|retroarch|dolphin emulator|pcsx|rpcs3|xenia|yuzu|ryujinx)/],
+    ['Plataformas de juegos', /(game launcher|gaming platform|steam|epic games|gog galaxy|ubisoft connect|battle net|ea app)/],
+    ['Educación', /(education|learning|study|school|classroom|language learning|training)/],
+    ['Finanzas', /(finance|accounting|budget|invoice|billing|banking|trading|cryptocurrency)/],
+    ['Productividad', /(productivity|task manager|notes|calendar|organizer|project management|pomodoro)/]
   ];
 
   for(const [category, pattern] of rules){
@@ -704,6 +714,31 @@ async function getRemoteFileSize(url=''){
   }
 }
 
+
+function parseRecommendedRequirementsFromText(...values){
+  const text = normalizeText(values.filter(Boolean).join('\n'));
+  if(!text) return '';
+
+  const lines = [];
+
+  const windows = text.match(/(?:recommended|recomendado|recommended os|sistema operativo recomendado)[^.\n]{0,80}(Windows\s+(?:10|11)(?:\s*64[- ]?bit)?)/i);
+  if(windows) lines.push(windows[1]);
+
+  const ram = text.match(/(?:recommended|recomendado|memory|memoria|ram)[^0-9\n]{0,40}(\d+(?:[.,]\d+)?)\s*(GB|MB)\s*(?:RAM)?/i);
+  if(ram) lines.push(`${ram[1].replace(',','.')} ${ram[2].toUpperCase()} de RAM`);
+
+  const cpu = text.match(/(?:recommended|recomendado|processor|procesador|cpu)[^.\n]{0,100}((?:Intel|AMD|Apple|ARM)[^.\n]{2,80}|\d+(?:[.,]\d+)?\s*GHz[^.\n]{0,50})/i);
+  if(cpu) lines.push(`Procesador: ${cpu[1].trim()}`);
+
+  const storage = text.match(/(?:recommended|recomendado|storage|almacenamiento|disk space|espacio)[^0-9\n]{0,50}(\d+(?:[.,]\d+)?)\s*(GB|MB|TB)/i);
+  if(storage) lines.push(`${storage[1].replace(',','.')} ${storage[2].toUpperCase()} de espacio disponible`);
+
+  const graphics = text.match(/(?:recommended|recomendado|graphics|gráficos|gpu)[^.\n]{0,100}((?:NVIDIA|AMD|Intel|DirectX|OpenGL)[^.\n]{2,90})/i);
+  if(graphics) lines.push(`Gráficos: ${graphics[1].trim()}`);
+
+  return joinUnique(lines).join('\n');
+}
+
 async function loadOfficialManifestData(packageId, version, token){
   const path = packageVersionPath(packageId, version);
   if(!path) return null;
@@ -806,11 +841,20 @@ async function loadOfficialManifestData(packageId, version, token){
       baseFile?.data?.ReleaseNotesUrl ||
       '';
 
+    const recommendedRequirements = parseRecommendedRequirementsFromText(
+      localeFile?.data?.Description,
+      localeFile?.data?.ShortDescription,
+      localeFile?.data?.ReleaseNotes,
+      baseFile?.data?.Description,
+      baseFile?.data?.ShortDescription,
+      baseFile?.data?.ReleaseNotes
+    );
+
     return {
       languages,
       size,
       reqMin: reqMinParts.join('\n'),
-      reqRec: '',
+      reqRec: recommendedRequirements,
       changelog: releaseNotes,
       releaseNotesUrl,
       manifestUrl:
@@ -911,6 +955,9 @@ async function buildProductFromIndexPackage(
         : '',
       !officialData?.reqMin
         ? 'La fuente no informó requisitos mínimos verificables.'
+        : '',
+      !officialData?.reqRec
+        ? 'La fuente no informó requisitos recomendados verificables.'
         : '',
       !officialData?.size
         ? 'La fuente no permitió verificar automáticamente el tamaño del instalador.'
