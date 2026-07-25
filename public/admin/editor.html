@@ -1090,6 +1090,7 @@
       setValue('tags', product.tags);
       setValue('install', product.install);
       setValue('notes', product.notes);
+      setValue('changelog', product.changelog);
 
       if(type === 'game'){
         await searchGameTrailer(product.name);
