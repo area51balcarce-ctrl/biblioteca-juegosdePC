@@ -373,6 +373,11 @@
     if(el) el.value = value;
   }
 
+  function setValueExact(id, value){
+    const el = document.getElementById(id);
+    if(el) el.value = value === undefined || value === null ? '' : value;
+  }
+
   const DOWNLOAD_TYPES = [
     'MediaFire','Pixeldrain','Google Drive','Mega','1Fichier',
     'GoFile','Buzzheavier','Qiwi','AkiraBox','Torrent','Magnet',
@@ -1081,19 +1086,28 @@
       setValue('category', product.category || (type === 'software' ? 'Software de PC' : 'Juego de PC'));
       setValue('status', product.status || 'ok');
       setValue('legalBasis', product.legalBasis || (type === 'software' ? 'freeware' : 'propio'));
-      setValue('description', product.description);
-      setValue('reqMin', product.reqMin);
-      setValue('reqRec', product.reqRec);
-      setValue('size', product.size);
-      setValue('version', product.version);
-      setValue('languages', product.languages || (type === 'game' ? 'Español, Inglés' : ''));
-      setValue('tags', product.tags);
-      setValue('install', product.install);
-      setValue('notes', product.notes);
-      setValue('changelog', product.changelog);
+      setValueExact('description', product.description);
+      setValueExact('reqMin', product.reqMin);
+      setValueExact('reqRec', product.reqRec);
+      setValueExact('size', product.size);
+      setValueExact('version', product.version);
+      setValueExact(
+        'languages',
+        product.languages || (type === 'game' ? 'Español, Inglés' : '')
+      );
+      setValueExact('tags', product.tags);
+      setValueExact('install', product.install);
+      setValueExact('notes', product.notes);
+      setValueExact('changelog', product.changelog);
 
       if(type === 'game'){
         await searchGameTrailer(product.name);
+      }else{
+        setValueExact('trailerUrl', '');
+        document.getElementById('trailer-view-btn').disabled = true;
+        const trailerStatus = document.getElementById('trailer-status');
+        trailerStatus.textContent = 'El software no utiliza búsqueda automática de trailer.';
+        trailerStatus.className = 'trailer-status';
       }
 
       if(product.coverUrl){
