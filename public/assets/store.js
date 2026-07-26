@@ -98,13 +98,31 @@ async function a51_requireSession(){
 async function a51_getCurrentAdmin(){
   const session = await a51_getSession();
   if(!session) return null;
-  const { data, error } = await A51_CLIENT
+
+  // Se intenta leer la marca comercial del usuario. El fallback mantiene
+  // compatibilidad con bases que todavía no tengan brand_name / brand_slug.
+  let { data, error } = await A51_CLIENT
     .from('admin_users')
-    .select('email, role')
+    .select('email, role, brand_name, brand_slug')
     .eq('id', session.user.id)
     .maybeSingle();
+
+  if(error && /brand_name|brand_slug/i.test(error.message || '')){
+    const fallback = await A51_CLIENT
+      .from('admin_users')
+      .select('email, role')
+      .eq('id', session.user.id)
+      .maybeSingle();
+    data = fallback.data;
+    error = fallback.error;
+  }
+
   if(error){ console.error(error); return null; }
-  return data;
+  return data ? {
+    ...data,
+    brand_name: String(data.brand_name || '').trim(),
+    brand_slug: a51_slugify(data.brand_slug || data.brand_name || '')
+  } : null;
 }
 
 /* ---------------------------------------------------------
