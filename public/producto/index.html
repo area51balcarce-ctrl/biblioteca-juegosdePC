@@ -100,7 +100,7 @@
 <div class="a51-scanbg"></div>
 
 <header class="a51-header">
-  <div class="a51-brand"><span class="dot"></span> ÁREA&nbsp;51</div>
+  <div class="a51-brand" id="public-brand"><span class="dot"></span> ÁREA&nbsp;51</div>
   <div class="a51-tag">ARCHIVO&nbsp;·&nbsp;ENTREGA&nbsp;DIRECTA</div>
 </header>
 
@@ -124,6 +124,34 @@
     freeware: "Freeware", shareware: "Shareware",
     "dominio-publico": "Dominio público / libre", reventa: "Licencia de reventa", propio: "Contenido propio",
   };
+
+  // Marcas autorizadas para enlaces compartidos por proveedores.
+  // Un valor desconocido nunca se muestra: vuelve automáticamente a ÁREA 51.
+  const PUBLIC_SELLER_BRANDS = Object.freeze({
+    'dga-games': 'DGA-GAMES',
+    'innovagamer': 'INNOVAGAMER'
+  });
+
+  function getPublicBrand(){
+    const sellerSlug = String(new URLSearchParams(location.search).get('seller') || '')
+      .trim()
+      .toLowerCase();
+
+    if(PUBLIC_SELLER_BRANDS[sellerSlug]){
+      return { slug:sellerSlug, name:PUBLIC_SELLER_BRANDS[sellerSlug], isPartner:true };
+    }
+
+    return { slug:'area51', name:'ÁREA 51', isPartner:false };
+  }
+
+  const PUBLIC_BRAND = getPublicBrand();
+
+  function applyPublicBrand(){
+    const brandNode = document.getElementById('public-brand');
+    if(brandNode){
+      brandNode.innerHTML = `<span class="dot"></span> ${esc(PUBLIC_BRAND.name).replace(/ /g, '&nbsp;')}`;
+    }
+  }
 
   function esc(s){
     return (s || '').toString().replace(/[&<>"']/g, c => ({
@@ -212,8 +240,8 @@
   }
 
   async function renderGame(g){
-    document.getElementById('page-title').textContent = `${g.name || 'Producto'} — ÁREA 51`;
-    document.title = `${g.name || 'Producto'} — ÁREA 51`;
+    document.getElementById('page-title').textContent = `${g.name || 'Producto'} — ${PUBLIC_BRAND.name}`;
+    document.title = `${g.name || 'Producto'} — ${PUBLIC_BRAND.name}`;
 
     const tags = (g.tags || '').split(',').map(t => t.trim()).filter(Boolean);
     const changelogLines = (g.changelog || '').split('\n').map(l => l.trim()).filter(Boolean);
@@ -296,7 +324,7 @@
       : "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='533'><rect width='100%25' height='100%25' fill='%23131a18'/><text x='50%25' y='50%25' fill='%2339ff9d' font-family='monospace' font-size='16' text-anchor='middle'>SIN PORTADA</text></svg>";
 
     document.getElementById('footer-legal').textContent =
-      `ÁREA 51 // Distribución: ${LEGAL_LABELS[g.legalBasis] || 'sin definir'}`;
+      `${PUBLIC_BRAND.name} // Distribución: ${LEGAL_LABELS[g.legalBasis] || 'sin definir'}`;
 
     document.getElementById('app').innerHTML = `
       <section class="hero">
@@ -457,6 +485,7 @@
 
   (async () => {
     try{
+      applyPublicBrand();
       const slug = new URLSearchParams(location.search).get('slug');
 
       if(!slug){
