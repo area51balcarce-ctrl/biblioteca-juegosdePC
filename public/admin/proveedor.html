@@ -112,8 +112,22 @@
 <script src="../assets/config.js"></script>
 <script src="../assets/store.js"></script>
 <script>
-  const BASE_URL = new URL('../producto/index.html', location.href).href + '?slug=';
+  const PRODUCT_PAGE_URL = new URL('../producto/index.html', location.href).href;
   let PRODUCTS = [];
+  let CURRENT_PROVIDER = null;
+
+  function buildPublicUrl(productSlug){
+    const url = new URL(PRODUCT_PAGE_URL);
+    url.searchParams.set('slug', productSlug || '');
+
+    // Solo los proveedores con marca asignada agregan su identificador.
+    // El administrador conserva el enlace habitual de ÁREA 51.
+    if(CURRENT_PROVIDER?.role === 'operator' && CURRENT_PROVIDER.brand_slug){
+      url.searchParams.set('seller', CURRENT_PROVIDER.brand_slug);
+    }
+
+    return url.href;
+  }
 
   function esc(value){
     return String(value ?? '').replace(/[&<>"']/g, char => ({
@@ -137,7 +151,7 @@
     }
 
     results.innerHTML = filtered.map(product => {
-      const publicUrl = BASE_URL + encodeURIComponent(product.slug || '');
+      const publicUrl = buildPublicUrl(product.slug || '');
       const coverStyle = product.cover?.url
         ? `style="background-image:url('${encodeURI(product.cover.url)}')"`
         : '';
@@ -193,13 +207,16 @@
     const user = await a51_getCurrentAdmin();
     if(!user) return;
 
+    CURRENT_PROVIDER = user;
+
     if(user.role !== 'operator'){
       window.location.assign('/admin/dashboard');
       return;
     }
 
+    const providerLabel = user.brand_name || user.email;
     document.getElementById('session-info').textContent =
-      `SESIÓN: ${user.email} · rol: proveedor`;
+      `SESIÓN: ${providerLabel} · rol: proveedor`;
 
     try{
       PRODUCTS = await a51_getProducts();
