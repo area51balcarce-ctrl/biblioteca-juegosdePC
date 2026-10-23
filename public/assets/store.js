@@ -187,6 +187,30 @@ const A51_PRODUCT_SELECT = `
   product_downloads ( id, type, group_name, label, url, status, position, health_status, checked_at )
 `;
 
+// ETAPA 1 — Proyección exclusivamente pública: nunca solicitar enlaces ni rutas privadas.
+// Las funciones administrativas originales se conservan para el editor y dashboard.
+const A51_PUBLIC_PRODUCT_SELECT = `
+  id, slug, name, description, req_min, req_rec, size, version, languages, trailer_url,
+  install, notes, changelog, dlc, legal_basis, status,
+  cover_path, cover_name, created_at, updated_at,
+  categories ( id, name ),
+  product_tags ( tags ( name ) )
+`;
+
+async function a51_getPublicProductBySlug(slug){
+  const { data, error } = await A51_CLIENT
+    .from('products')
+    .select(A51_PUBLIC_PRODUCT_SELECT)
+    .eq('slug', slug)
+    .eq('status', 'ok')
+    .maybeSingle();
+  if(error){ console.error(error); return null; }
+  if(!data) return null;
+  const mapped = a51_mapProductRow(data);
+  // No se transfieren al renderizador público los campos de descargas/archivos.
+  return { ...mapped, downloads:[], files:{ main:null, notes:null, other:null } };
+}
+
 function a51_publicCoverUrl(path){
   if(!path) return null;
   const { data } = A51_CLIENT.storage.from('covers').getPublicUrl(path);
