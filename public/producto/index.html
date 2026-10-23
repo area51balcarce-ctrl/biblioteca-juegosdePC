@@ -227,10 +227,6 @@
       });
     });
 
-    document.getElementById('open-downloads')?.addEventListener('click', ()=>{
-      openModal('downloads-modal');
-    });
-
 
     document.querySelectorAll('[data-close-modal]').forEach(el=>{
       el.addEventListener('click', ()=>{
@@ -245,78 +241,7 @@
 
     const tags = (g.tags || '').split(',').map(t => t.trim()).filter(Boolean);
     const changelogLines = (g.changelog || '').split('\n').map(l => l.trim()).filter(Boolean);
-    const activeDownloads = (g.downloads || []).filter(item =>
-      item && item.url && item.status !== 'disabled'
-    );
-
-    // Los archivos auxiliares del editor se guardan en files.main y files.other.
-    // El campo "Torrent u otro archivo pequeño" corresponde a files.main.
-    const auxiliaryFiles = [
-      g.files?.main ? { ...g.files.main, fallbackType:'Torrent' } : null,
-      g.files?.other ? { ...g.files.other, fallbackType:'Otro archivo' } : null
-    ].filter(Boolean);
-
-    for(const file of auxiliaryFiles){
-      if(!file.path) continue;
-
-      const signedUrl = await a51_getSignedDownloadUrl(file.path);
-      if(!signedUrl) continue;
-
-      const fileName = String(file.name || '').trim();
-      const isTorrent = fileName.toLowerCase().endsWith('.torrent');
-
-      activeDownloads.push({
-        type: isTorrent ? 'Torrent' : file.fallbackType,
-        group_name: 'Descargas',
-        label: fileName || (isTorrent ? 'Archivo torrent' : file.fallbackType),
-        url: signedUrl,
-        status: 'active',
-        healthStatus: 'unchecked',
-        position: activeDownloads.length
-      });
-    }
-
-    const hasTorrentDownload = activeDownloads.some(item => {
-      const type = String(item?.type || '').toLowerCase();
-      const url = String(item?.url || '').toLowerCase();
-      return type.includes('torrent') || type.includes('magnet') || url.startsWith('magnet:');
-    });
-
-    const preparedDownloads = activeDownloads.map((item, index) => {
-      const groupName = String(item.group_name || '').trim() || 'Descargas';
-      const itemLabel = String(item.label || '').trim();
-
-      return {
-        ...item,
-        group_name: groupName,
-        label: itemLabel,
-        originalIndex: index,
-        prepared: a51_prepareDownloadLink(item)
-      };
-    }).filter(item => item.prepared.url);
-
-    const groupsMap = new Map();
-
-    preparedDownloads.forEach(item => {
-      if(!groupsMap.has(item.group_name)){
-        groupsMap.set(item.group_name, []);
-      }
-
-      groupsMap.get(item.group_name).push(item);
-    });
-
-    const getDownloadOrder = item =>
-      Number.isFinite(Number(item.position))
-        ? Number(item.position)
-        : item.originalIndex;
-
-    const downloadGroups = [...groupsMap.entries()].map(([name, items]) => ({
-      name,
-      items: items.sort((a, b) => {
-        const diff = getDownloadOrder(a) - getDownloadOrder(b);
-        return diff || a.originalIndex - b.originalIndex;
-      })
-    })).filter(group => group.items.length);
+    // ETAPA 1: la ficha pública no recibe ni solicita enlaces de descarga.
 
     const installText = publicInstallText(g.install);
 
@@ -346,7 +271,7 @@
             </div>
 
             <div class="cta-row">
-              ${preparedDownloads.length ? `<button class="btn btn-primary" id="open-downloads" type="button">↓ Ir a descargas</button>` : ''}
+              <span class="badge badge-off">Descargas disponibles únicamente tras autorización de compra</span>
             </div>
           </div>
         </div>
@@ -411,67 +336,6 @@
         </aside>
       </main>
 
-      <div class="modal" id="downloads-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="downloads-title">
-        <div class="modal-backdrop" data-close-modal></div>
-        <div class="modal-card">
-          <div class="modal-head">
-            <h2 id="downloads-title">Descargas disponibles</h2>
-            <button class="modal-close" type="button" aria-label="Cerrar" data-close-modal>×</button>
-          </div>
-          <div class="modal-body">
-            <div class="download-list">
-              ${downloadGroups.length ? downloadGroups.map(group => `
-                <section class="download-group">
-                  <h3 class="download-group-title">${esc(group.name)}</h3>
-                  <div class="download-group-items">
-                    ${group.items.map(item => {
-                      const visibleLabel =
-                        String(item.label || '').trim()
-                        || String(item.prepared.type || item.type || 'Descarga').trim();
-
-                      const providerLabel = downloadLabel(item.prepared.type || item.type);
-
-                      const statusText =
-                        item.healthStatus === 'down'
-                          ? 'Enlace caído'
-                          : item.healthStatus === 'review'
-                            ? 'Revisión manual'
-                            : item.prepared.direct
-                              ? 'Descarga directa'
-                              : 'Abrir servidor';
-
-                      return `
-                        <div class="dl-item">
-                          <div class="lbl">
-                            <b>${esc(visibleLabel)}</b>
-                            <small>${esc(providerLabel)} · ${esc(statusText)}</small>
-                          </div>
-                          <a class="btn" href="${esc(item.prepared.url)}"
-                            ${item.prepared.action === 'download' ? 'download' : ''}
-                            ${item.prepared.action === 'open' && item.prepared.type !== 'Magnet' ? 'target="_blank" rel="noopener noreferrer"' : ''}>${item.prepared.type === 'Magnet' ? 'Abrir' : 'Descargar'}</a>
-                        </div>
-                      `;
-                    }).join('')}
-                  </div>
-                </section>
-              `).join('') : '<div class="dl-empty">No hay enlaces disponibles.</div>'}
-            </div>
-
-            ${hasTorrentDownload ? `
-            <div class="torrent-client">
-              <h3>¿No tenés un cliente BitTorrent?</h3>
-              <p>Para abrir archivos <strong>.torrent</strong> necesitás un cliente compatible. Recomendamos qBittorrent porque es gratuito, sin publicidad y de código abierto.</p>
-              <div class="client-card">
-                <div class="client-copy">
-                  <b>🟢 qBittorrent</b>
-                  <small>Sitio oficial · Windows, macOS y Linux</small>
-                </div>
-                <a class="btn btn-primary" href="https://www.qbittorrent.org/download" target="_blank" rel="noopener noreferrer">⬇ Descargar qBittorrent</a>
-              </div>
-            </div>` : ''}
-          </div>
-        </div>
-      </div>
     `;
 
     bindInteractions();
@@ -493,7 +357,7 @@
         return;
       }
 
-      const product = await a51_getProductBySlug(slug);
+      const product = await a51_getPublicProductBySlug(slug);
 
       if(!product){
         renderEmpty(`No se encontró "${slug}" en el catálogo`);
