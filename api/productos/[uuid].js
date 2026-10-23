@@ -32,7 +32,7 @@ module.exports = async function handler(req, res){
   const select = [
     'id','slug','name','description','req_min','req_rec','size','version','languages','trailer_url',
     'install','notes','changelog','dlc','legal_basis','status','cover_path','updated_at',
-    'categories(name)','product_tags(tags(name))','product_downloads(type,url,status,position)'
+    'categories(name)','product_tags(tags(name))'
   ].join(',');
 
   const endpoint = new URL(`${supabaseUrl}/rest/v1/products`);
@@ -67,15 +67,6 @@ module.exports = async function handler(req, res){
     const origin = `https://${req.headers['x-forwarded-host'] || req.headers.host}`;
     const productUrl = `${origin}/producto?slug=${encodeURIComponent(row.slug)}`;
     const tags = (row.product_tags || []).map(item => item?.tags?.name).filter(Boolean);
-    const downloads = (row.product_downloads || [])
-      .filter(item => item?.url && item.status !== 'disabled')
-      .map(item => ({
-        tipo: item.type || 'Otro',
-        url: item.url,
-        estado: item.status || 'active',
-        posicion: Number(item.position || 0)
-      }))
-      .sort((a,b) => a.posicion - b.posicion);
 
     return json(res, 200, {
       producto:{
@@ -89,7 +80,7 @@ module.exports = async function handler(req, res){
         version: row.version || '',
         idiomas: row.languages || '',
         trailer_url: row.trailer_url || '',
-        descargas: downloads,
+        descargas: [], // Compatibilidad de respuesta: nunca exponer enlaces públicos.
         instrucciones: row.install || '',
         notas: row.notes || '',
         changelog: row.changelog || '',
