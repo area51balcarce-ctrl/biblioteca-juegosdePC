@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Precios por categoría — ÁREA 51</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <style>
+    .a51-prices-wrap{max-width:900px;margin:0 auto;padding:34px 22px 70px}
+    .a51-prices-head{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:24px}
+    .a51-prices-head h1{font-size:clamp(22px,4vw,32px);margin:7px 0}
+    .a51-prices-link{color:var(--accent);text-decoration:none;font-family:var(--f-mono);font-size:12px}
+    .a51-prices-note{color:var(--text-dim);font-size:13px;line-height:1.6;margin-bottom:22px}
+    .a51-prices-status{padding:12px 14px;border:1px solid var(--line-bright);color:var(--text-dim);font-family:var(--f-mono);font-size:12px;margin-bottom:20px}
+    .a51-prices-status.error{color:#ff8080;border-color:#ff8080}
+    .a51-prices-status.success{color:var(--accent);border-color:var(--accent)}
+    .a51-prices-list{display:grid;gap:12px}
+    .a51-price-card{background:var(--bg-panel-2);border:1px solid var(--line-bright);padding:18px}
+    .a51-price-name{font-weight:600;font-size:16px;margin-bottom:8px;overflow-wrap:anywhere}
+    .a51-price-current{font-family:var(--f-mono);font-size:11px;color:var(--text-faint);margin-bottom:14px}
+    .a51-price-controls{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+    .a51-price-controls input{min-width:180px;flex:1;background:var(--bg-elev);border:1px solid var(--line-bright);color:var(--text);padding:11px;font-family:var(--f-mono);font-size:14px}
+    .a51-price-controls button{background:transparent;color:var(--text);border:1px solid var(--line-bright);padding:11px 14px;cursor:pointer;font-family:var(--f-mono);font-size:12px}
+    .a51-price-controls button.primary{border-color:var(--accent);color:var(--accent)}
+    .a51-price-controls button:disabled{opacity:.5;cursor:wait}
+    .a51-price-message{min-height:18px;font-size:12px;margin-top:10px;color:var(--text-dim)}
+    .a51-price-message.error{color:#ff8080}
+    .a51-price-message.success{color:var(--accent)}
+  </style>
+</head>
+<body>
+  <div class="a51-scanbg"></div>
+  <main class="a51-prices-wrap">
+    <div class="a51-prices-head">
+      <div><div class="eyebrow">ÁREA 51 · Administración</div><h1>💰 Precios por categoría</h1></div>
+      <a class="a51-prices-link" href="/admin/dashboard.html">← Volver al catálogo</a>
+    </div>
+    <p class="a51-prices-note">Cada categoría tiene un único precio en pesos argentinos. Los productos de categorías sin precio no podrán ofrecerse a la venta cuando se habilite el carrito. Esta pantalla no publica compras ni modifica enlaces de descarga.</p>
+    <div id="a51-prices-status" class="a51-prices-status" role="status" aria-live="polite">Verificando sesión administrativa…</div>
+    <section id="a51-prices-list" class="a51-prices-list" aria-label="Precios de categorías"></section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="../assets/config.js"></script>
+  <script src="../assets/store.js"></script>
+  <script>
+    'use strict';
+    const statusEl = document.getElementById('a51-prices-status');
+    const listEl = document.getElementById('a51-prices-list');
+    const ars = new Intl.NumberFormat('es-AR', {style:'currency', currency:'ARS', maximumFractionDigits:0});
+    function setStatus(message, kind=''){
+      statusEl.textContent = message;
+      statusEl.className = 'a51-prices-status' + (kind ? ' ' + kind : '');
+    }
+    function validPrice(raw){
+      const value = String(raw).trim();
+      if(!/^[1-9]\d*$/.test(value)) return null;
+      const n = Number(value);
+      return Number.isSafeInteger(n) ? n : null;
+    }
+    async function loadCategories(){
+      const {data, error} = await A51_CLIENT.from('categories').select('id,name,price_ars').order('name', {ascending:true});
+      if(error) throw error;
+      listEl.replaceChildren();
+      for(const category of data || []){
+        const card = document.createElement('article');
+        card.className = 'a51-price-card';
+        const name = document.createElement('div');
+        name.className = 'a51-price-name';
+        name.textContent = category.name;
+        const current = document.createElement('div');
+        current.className = 'a51-price-current';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.inputMode = 'numeric';
+        input.autocomplete = 'off';
+        input.placeholder = 'Ej.: 15000';
+        input.setAttribute('aria-label', 'Precio en pesos para ' + category.name);
+        const save = document.createElement('button');
+        save.type = 'button';
+        save.className = 'primary';
+        save.textContent = 'Guardar precio';
+        const clear = document.createElement('button');
+        clear.type = 'button';
+        clear.textContent = 'Quitar precio';
+        const message = document.createElement('div');
+        message.className = 'a51-price-message';
+        message.setAttribute('role','status');
+        function showCurrent(){
+          current.textContent = category.price_ars == null ? 'Actual: sin precio asignado' : 'Actual: ' + ars.format(Number(category.price_ars));
+          input.value = category.price_ars == null ? '' : String(category.price_ars);
+        }
+        function setMessage(value,kind=''){
+          message.textContent=value;
+          message.className='a51-price-message'+(kind?' '+kind:'');
+        }
+        async function persist(nextPrice){
+          save.disabled=true;
+          clear.disabled=true;
+          setMessage('Guardando…');
+          try{
+            const {data: updated,error} = await A51_CLIENT.from('categories')
+              .update({price_ars:nextPrice}).eq('id',category.id)
+              .select('id,price_ars').single();
+            if(error) throw error;
+            if(!updated || updated.id !== category.id) throw new Error('No se pudo confirmar el cambio.');
+            category.price_ars = updated.price_ars;
+            showCurrent();
+            setMessage('Guardado correctamente ✓','success');
+          }catch(error){
+            console.error('AREA51 precios',error);
+            setMessage('No se pudo guardar. Verificá tu sesión y volvé a intentar.','error');
+          }finally{
+            save.disabled=false;
+            clear.disabled=false;
+          }
+        }
+        save.addEventListener('click',()=>{
+          const price=validPrice(input.value);
+          if(price===null){setMessage('Ingresá un importe entero positivo, sin puntos ni comas.','error');return;}
+          if(String(category.price_ars ?? '')===String(price)){setMessage('El precio ya tiene ese valor.');return;}
+          persist(price);
+        });
+        clear.addEventListener('click',()=>{
+          if(category.price_ars==null){setMessage('La categoría ya está sin precio.');return;}
+          if(confirm('¿Quitar el precio de «'+category.name+'»? Sus productos dejarán de ser comprables cuando se habilite la tienda.')) persist(null);
+        });
+        const controls=document.createElement('div');
+        controls.className='a51-price-controls';
+        controls.append(input,save,clear);
+        card.append(name,current,controls,message);
+        listEl.appendChild(card);
+        showCurrent();
+      }
+      setStatus('Categorías cargadas: '+(data || []).length+'. Solo tu cuenta administrativa puede guardar cambios.','success');
+    }
+    (async()=>{
+      try{
+        const session = await a51_requireSession();
+        if(!session) return;
+        const admin = await a51_getCurrentAdmin();
+        if(!admin || admin.role !== 'admin'){
+          setStatus('Acceso exclusivo para administradores.','error');
+          return;
+        }
+        await loadCategories();
+      }catch(error){
+        console.error('AREA51 precios',error);
+        setStatus('No se pudieron cargar las categorías. Revisá tu sesión y la conexión con Supabase.','error');
+      }
+    })();
+  </script>
+</body>
+</html>
