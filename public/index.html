@@ -1,30 +1,89 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es-AR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="robots" content="noindex, nofollow">
-<title>ÁREA 51</title>
-<link rel="stylesheet" href="assets/style.css">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>ÁREA 51 · Juegos y software para PC</title>
+<link rel="stylesheet" href="/assets/style.css">
 <style>
-  body{ min-height:100vh; display:flex; align-items:center; justify-content:center; }
-  .home{ max-width:480px; padding:40px; text-align:center; }
-  .home h1{ font-size:26px; margin:14px 0 4px; }
-  .home .tagline{ font-family:var(--f-mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--accent); margin-bottom:18px; }
-  .home p{ color:var(--text-dim); font-size:14px; margin-bottom:26px; }
-  .home .links{ display:flex; flex-direction:column; gap:10px; }
+:root{--shop-green:#31ef9b;--shop-bg:#070b0c;--shop-panel:#101918;--shop-line:#274139;--shop-muted:#8da59c}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:var(--shop-bg);color:#eaf7f1;font-family:system-ui,-apple-system,Segoe UI,sans-serif;display:block}
+a{color:inherit;text-decoration:none}button,input,select{font:inherit}button{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.5}
+.shop-wrap{max-width:1350px;margin:auto;padding:0 24px}.shop-header{position:sticky;top:0;z-index:10;background:#09110ff5;border-bottom:1px solid var(--shop-line);backdrop-filter:blur(10px)}.shop-header .shop-wrap{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:76px}.shop-logo{font-weight:900;letter-spacing:.06em;font-size:20px}.shop-logo span{color:var(--shop-green)}.shop-tagline{font-size:10px;letter-spacing:.15em;color:var(--shop-muted);margin-top:4px}.shop-nav{display:flex;align-items:center;gap:12px}.shop-nav a{font-size:12px;color:var(--shop-muted)}
+.shop-btn{border:1px solid var(--shop-green);background:#123527;color:var(--shop-green);padding:11px 14px;border-radius:5px;font-size:13px;font-weight:700}.shop-btn:hover:not(:disabled){background:#194d38}.shop-btn.secondary{border-color:var(--shop-line);background:transparent;color:#d4e4db}.shop-btn.full{width:100%}.shop-hero{padding:62px 0 35px;background:radial-gradient(ellipse at 20% 0%,#123b2b 0%,transparent 55%)}.shop-eyebrow{color:var(--shop-green);font-size:11px;letter-spacing:.18em;text-transform:uppercase;font-weight:800}.shop-hero h1{font-size:clamp(30px,5vw,57px);line-height:1.08;max-width:740px;margin:14px 0}.shop-hero p{color:var(--shop-muted);max-width:680px;line-height:1.6}.shop-controls{display:flex;flex-wrap:wrap;gap:12px;margin:25px 0}.shop-controls input,.shop-controls select{background:var(--shop-panel);border:1px solid var(--shop-line);color:#eefaf4;border-radius:5px;padding:13px 15px;min-height:47px}.shop-controls input{flex:1;min-width:210px}.shop-controls select{min-width:180px}.shop-info{font-size:13px;color:var(--shop-muted);margin:15px 0 22px}.shop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:20px;padding-bottom:65px}.shop-card{min-width:0;background:var(--shop-panel);border:1px solid var(--shop-line);border-radius:7px;overflow:hidden;display:flex;flex-direction:column}.shop-cover{aspect-ratio:2/3;background:linear-gradient(130deg,#102a21,#0b1010);display:flex;align-items:center;justify-content:center;overflow:hidden}.shop-cover img{width:100%;height:100%;object-fit:cover;display:block}.shop-placeholder{font-size:13px;color:var(--shop-muted);padding:20px;text-align:center}.shop-card-body{padding:15px;display:flex;flex-direction:column;gap:9px;flex:1}.shop-category{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--shop-green)}.shop-name{font-size:16px;font-weight:750;line-height:1.3;overflow-wrap:anywhere}.shop-price{font-size:22px;color:var(--shop-green);font-weight:850}.shop-unpriced{font-size:13px;color:var(--shop-muted)}.shop-card-actions{display:flex;gap:8px;margin-top:auto;padding-top:7px}.shop-card-actions .shop-btn{flex:1;text-align:center;font-size:12px;padding:10px 7px}.shop-empty{border:1px dashed var(--shop-line);padding:30px;color:var(--shop-muted);border-radius:6px;margin-bottom:50px}.shop-footer{border-top:1px solid var(--shop-line);padding:25px 0;color:var(--shop-muted);font-size:12px}
+.shop-drawer-backdrop{position:fixed;inset:0;background:#000a;z-index:20;display:none}.shop-drawer-backdrop.open{display:block}.shop-drawer{position:fixed;z-index:21;right:0;top:0;height:100dvh;width:min(440px,100%);background:#0d1715;border-left:1px solid var(--shop-line);transform:translateX(105%);transition:transform .2s ease;display:flex;flex-direction:column}.shop-drawer.open{transform:translateX(0)}.shop-drawer-head{padding:22px;border-bottom:1px solid var(--shop-line);display:flex;justify-content:space-between;align-items:center}.shop-drawer-content{padding:20px;overflow:auto;flex:1}.shop-cart-item{padding:14px 0;border-bottom:1px solid var(--shop-line);display:flex;justify-content:space-between;gap:10px}.shop-cart-item strong{display:block;margin-bottom:6px}.shop-cart-item small{color:var(--shop-green)}.shop-cart-footer{padding:22px;border-top:1px solid var(--shop-line)}.shop-total{display:flex;justify-content:space-between;font-size:20px;font-weight:800;margin-bottom:16px}.shop-note{font-size:12px;line-height:1.6;color:var(--shop-muted)}.shop-sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+@media(max-width:600px){.shop-wrap{padding:0 14px}.shop-hero{padding:35px 0 15px}.shop-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.shop-card-body{padding:10px}.shop-name{font-size:13px}.shop-price{font-size:18px}.shop-card-actions{flex-direction:column}.shop-nav a{display:none}.shop-header .shop-wrap{min-height:65px}}
 </style>
 </head>
 <body>
-<div class="a51-scanbg"></div>
-<div class="panel home bracket-frame">
-  <div class="eyebrow" style="justify-content:center;">Biblioteca digital privada</div>
-  <h1>ÁREA 51</h1>
-  <div class="tagline">Te abduce a la tecnología</div>
-  <p>Panel de administración de catálogo digital y fichas de producto para compartir con clientes.</p>
-  <div class="links">
-    <a class="btn btn-primary btn-block" href="admin/index.html">Ir al panel de administración →</a>
-  </div>
-</div>
+<header class="shop-header"><div class="shop-wrap"><div><a href="/" class="shop-logo"><span>●</span> ÁREA 51</a><div class="shop-tagline">👽 TE ABDUCE A LA TECNOLOGÍA</div></div><nav class="shop-nav"><a href="/admin/index.html">Administración</a><button id="openCart" class="shop-btn" type="button" aria-controls="cartDrawer">🛒 Carrito (<span id="cartCount">0</span>)</button></nav></div></header>
+<main>
+<section class="shop-hero"><div class="shop-wrap"><div class="shop-eyebrow">🛸 Biblioteca digital · PC</div><h1>Explorá juegos y software para tu PC</h1><p>Elegí tus favoritos, consultá sus requisitos y armá tu carrito. Los pagos y las descargas estarán disponibles cuando finalicemos la implementación segura de la tienda.</p></div></section>
+<section class="shop-wrap" aria-label="Catálogo"><div class="shop-controls"><label class="shop-sr-only" for="search">Buscar productos</label><input id="search" type="search" placeholder="Buscar juegos o programas..." autocomplete="off"><label class="shop-sr-only" for="category">Filtrar categoría</label><select id="category"><option value="">Todas las categorías</option></select><label class="shop-sr-only" for="sort">Ordenar productos</label><select id="sort"><option value="name">Nombre A–Z</option><option value="price_asc">Menor precio</option><option value="price_desc">Mayor precio</option></select></div><p id="status" class="shop-info" role="status">Cargando catálogo...</p><div id="grid" class="shop-grid"></div><div id="empty" class="shop-empty" hidden>No se encontraron productos con esos filtros.</div></section>
+</main>
+<footer class="shop-footer"><div class="shop-wrap">🛸 ÁREA 51 · 👽 TE ABDUCE A LA TECNOLOGÍA · Productos digitales sujetos a disponibilidad y autorización de distribución.</div></footer>
+<div id="cartBackdrop" class="shop-drawer-backdrop" aria-hidden="true"></div><aside id="cartDrawer" class="shop-drawer" role="dialog" aria-modal="true" aria-label="Carrito de compras" aria-hidden="true"><div class="shop-drawer-head"><strong>🛒 Tu carrito</strong><button id="closeCart" type="button" class="shop-btn secondary">Cerrar ✕</button></div><div class="shop-drawer-content" id="cartItems"></div><div class="shop-cart-footer"><div class="shop-total"><span>Total estimado</span><span id="cartTotal">$ 0</span></div><button class="shop-btn full" disabled type="button">Compra online próximamente</button><p class="shop-note">No se procesan pagos todavía. Los precios definitivos y la disponibilidad se verificarán en el servidor al habilitar las compras.</p></div></aside>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="/assets/config.js"></script>
+<script src="/assets/store.js"></script>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
+const state={products:[],cart:new Set(),loaded:false};
+const CART_KEY='a51_shop_cart_draft_v1';
+try{const saved=JSON.parse(sessionStorage.getItem(CART_KEY)||'[]');if(Array.isArray(saved))saved.filter(x=>typeof x==='string').slice(0,1000).forEach(x=>state.cart.add(x));}catch{}
+function persist(){try{sessionStorage.setItem(CART_KEY,JSON.stringify([...state.cart]));}catch{}}
+function priceOf(p){const n=p.price_ars;return Number.isSafeInteger(n)&&n>0?n:null;}
+function setText(el,text){el.textContent=text;}
+function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;}
+function productUrl(p){return '/producto/?slug='+encodeURIComponent(p.slug);}
+function cartProducts(){return state.products.filter(p=>state.cart.has(p.id)&&priceOf(p)!==null);}
+function updateCart(){
+ const valid=new Set(state.products.filter(p=>priceOf(p)!==null).map(p=>p.id));
+ if(state.loaded){for(const id of [...state.cart])if(!valid.has(id))state.cart.delete(id);persist();}
+ setText($('cartCount'),String(state.cart.size));const container=$('cartItems');container.replaceChildren();
+ const items=cartProducts();if(!items.length){container.append(el('p','shop-note','Tu carrito está vacío. Elegí productos desde el catálogo.'));}
+ for(const p of items){const line=el('div','shop-cart-item');const info=el('div');info.append(el('strong','',p.name),el('small','',money(priceOf(p))));const remove=el('button','shop-btn secondary','Quitar');remove.type='button';remove.addEventListener('click',()=>{state.cart.delete(p.id);persist();updateCart();render();});line.append(info,remove);container.append(line);}
+ setText($('cartTotal'),money(items.reduce((sum,p)=>sum+priceOf(p),0)));
+}
+function render(){
+ const q=$('search').value.trim().toLocaleLowerCase('es-AR');const category=$('category').value;const sort=$('sort').value;
+ const products=state.products.filter(p=>(!category||p.category_id===category)&&(!q||(p.name+' '+p.category_name).toLocaleLowerCase('es-AR').includes(q)));
+ products.sort((a,b)=>sort==='price_asc'?(priceOf(a)??Infinity)-(priceOf(b)??Infinity)||a.name.localeCompare(b.name,'es'):sort==='price_desc'?(priceOf(b)??-1)-(priceOf(a)??-1)||a.name.localeCompare(b.name,'es'):a.name.localeCompare(b.name,'es'));
+ $('grid').replaceChildren();$('empty').hidden=products.length>0;setText($('status'),`${products.length} productos encontrados · ${state.products.length} publicados`);
+ for(const p of products){
+  const card=el('article','shop-card');const coverLink=el('a','shop-cover');coverLink.href=productUrl(p);coverLink.setAttribute('aria-label','Ver '+p.name);
+  if(p.cover_path){const img=el('img');img.src=a51_publicCoverUrl(p.cover_path);img.alt='Portada de '+p.name;img.loading='lazy';img.addEventListener('error',()=>{img.remove();coverLink.append(el('span','shop-placeholder','Portada no disponible'));},{once:true});coverLink.append(img);}else coverLink.append(el('span','shop-placeholder','Portada no disponible'));
+  const body=el('div','shop-card-body');body.append(el('span','shop-category',p.category_name||'Sin categoría'));const name=el('a','shop-name',p.name);name.href=productUrl(p);body.append(name);
+  const price=priceOf(p);body.append(price===null?el('div','shop-unpriced','Precio no disponible'):el('div','shop-price',money(price)));
+  const actions=el('div','shop-card-actions');const details=el('a','shop-btn secondary','Ver ficha');details.href=productUrl(p);actions.append(details);
+  const add=el('button','shop-btn',price===null?'No disponible':state.cart.has(p.id)?'✓ Agregado':'+ Agregar');add.type='button';add.disabled=price===null||state.cart.has(p.id);
+  add.addEventListener('click',()=>{if(priceOf(p)===null)return;state.cart.add(p.id);persist();updateCart();render();});actions.append(add);body.append(actions);card.append(coverLink,body);$('grid').append(card);
+ }
+}
+function toggleCart(open){$('cartDrawer').classList.toggle('open',open);$('cartBackdrop').classList.toggle('open',open);$('cartDrawer').setAttribute('aria-hidden',String(!open));$('cartBackdrop').setAttribute('aria-hidden',String(!open));if(open){updateCart();$('closeCart').focus();}else $('openCart').focus();}
+$('openCart').addEventListener('click',()=>toggleCart(true));$('closeCart').addEventListener('click',()=>toggleCart(false));$('cartBackdrop').addEventListener('click',()=>toggleCart(false));document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('cartDrawer').classList.contains('open'))toggleCart(false);});['search','category','sort'].forEach(id=>$(id).addEventListener(id==='search'?'input':'change',render));
+async function load(){
+ try{
+  if(typeof A51_CLIENT==='undefined'||typeof a51_publicCoverUrl!=='function')throw new Error('No se pudo iniciar la conexión pública de Supabase.');
+  // Solo metadatos públicos. Nunca consultar product_downloads ni rutas privadas.
+  const [productRes,categoryRes]=await Promise.all([
+   A51_CLIENT.from('products').select('id,slug,name,cover_path,category_id').eq('status','ok').order('name').range(0,999),
+   A51_CLIENT.from('categories').select('id,name,price_ars').order('name')
+  ]);
+  if(productRes.error)throw productRes.error;if(categoryRes.error)throw categoryRes.error;
+  const categories=categoryRes.data||[];const byId=new Map(categories.map(c=>[c.id,c]));
+  state.products=(productRes.data||[]).map(p=>{const c=byId.get(p.category_id);return {...p,category_name:c?.name||'',price_ars:c?.price_ars==null?null:Number(c.price_ars)};});
+  for(const c of categories){const option=el('option','',c.name);option.value=c.id;$('category').append(option);}
+  state.loaded=true;updateCart();render();
+  if((productRes.data||[]).length===1000)setText($('status'),'Se muestran los primeros 1000 productos.');
+ }catch(error){console.error('ÁREA 51 catálogo:',error);setText($('status'),'No se pudo cargar el catálogo. Actualizá la página para reintentar.');$('empty').hidden=false;setText($('empty'),'No pudimos consultar los productos en este momento.');}
+}
+load();
+})();
+</script>
 </body>
 </html>
