@@ -26,13 +26,13 @@ function message(text,error=false){status.textContent=text;status.className='not
 let libraryRequest=0;
 function view(session){$('login').hidden=!!session;$('logged').hidden=!session;if(session){$('account').textContent=session.email;$('expiry').textContent='La sesión vence: '+new Date(session.expiresAt).toLocaleString('es-AR');message('Acceso de prueba verificado correctamente.');loadLibrary();}else{libraryRequest++;$('libraryList').replaceChildren();message('Ingresá tu correo para recibir un código de acceso.');}}
 async function api(path,options){const response=await fetch(path,{credentials:'same-origin',cache:'no-store',...options});let data;try{data=await response.json();}catch{throw new Error('El servidor no devolvió una respuesta válida.');}if(!response.ok)throw new Error(data.error||'No se pudo completar la operación.');return data;}
-async function refresh(){try{const session=await api('/api/mis-compras-session');view(session);}catch(e){if(e.message==='El servidor no devolvió una respuesta válida.')message(e.message,true);view(null);}}
+async function refresh(){try{const session=await api('/api/mis-compras?action=session');view(session);}catch(e){if(e.message==='El servidor no devolvió una respuesta válida.')message(e.message,true);view(null);}}
 async function loadLibrary(){
  const request=++libraryRequest;
  const list=$('libraryList'), note=$('libraryStatus');
  list.replaceChildren();note.textContent='Consultando compras...';
  try{
-  const data=await api('/api/mis-compras-productos');
+  const data=await api('/api/mis-compras?action=productos');
   if(request!==libraryRequest)return;
   if(!Array.isArray(data.products))throw new Error('Respuesta inesperada.');
   if(!data.products.length){note.textContent='Todavía no tenés compras pagadas registradas en esta biblioteca.';return;}
@@ -50,7 +50,7 @@ async function loadLibrary(){
 function busy(form,value){for(const button of form.querySelectorAll('button'))button.disabled=value;}
 $('requestForm').addEventListener('submit',async e=>{e.preventDefault();const form=e.currentTarget;busy(form,true);message('Enviando código...');try{await api('/api/request-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value.trim()})});$('verifyForm').hidden=false;message('Código enviado. Revisá tu correo (también spam).');$('code').focus();}catch(error){message(error.message,true);}finally{busy(form,false);}});
 $('verifyForm').addEventListener('submit',async e=>{e.preventDefault();const form=e.currentTarget;busy(form,true);message('Verificando código...');try{await api('/api/verify-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value.trim(),code:$('code').value.trim()})});$('code').value='';await refresh();}catch(error){message(error.message,true);}finally{busy(form,false);}});
-$('logout').addEventListener('click',async()=>{const btn=$('logout');btn.disabled=true;try{await api('/api/mis-compras-logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});$('verifyForm').hidden=true;view(null);}catch(error){message(error.message,true);}finally{btn.disabled=false;}});
+$('logout').addEventListener('click',async()=>{const btn=$('logout');btn.disabled=true;try{await api('/api/mis-compras?action=logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});$('verifyForm').hidden=true;view(null);}catch(error){message(error.message,true);}finally{btn.disabled=false;}});
 refresh();
 })();
 </script>
