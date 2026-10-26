@@ -1,21 +1,36 @@
 <!DOCTYPE html>
 <html lang="es-AR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex,nofollow">
-<title>👽 Mis Compras · AREA 51</title>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>👽 Mis Compras · AREA 51</title>
 <style>
-:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#070b0c;color:#eaf7f1;font-family:system-ui,-apple-system,Segoe UI,sans-serif;display:grid;place-items:center;padding:24px}.panel{width:min(520px,100%);border:1px solid #274139;background:#101918;border-radius:12px;padding:32px;text-align:center}h1{color:#31ef9b;margin:0 0 16px}p{color:#b2c8bc;line-height:1.65}a{display:inline-block;margin-top:20px;border:1px solid #31ef9b;background:#123527;color:#31ef9b;text-decoration:none;border-radius:6px;padding:12px 18px;font-weight:700}.note{font-size:13px;color:#8da59c}
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#070b0c;color:#eaf7f1;font-family:system-ui,-apple-system,Segoe UI,sans-serif;display:grid;place-items:center;padding:24px}.panel{width:min(520px,100%);border:1px solid #274139;background:#101918;border-radius:12px;padding:32px;text-align:center}h1{color:#31ef9b;margin:0 0 16px}p{color:#b2c8bc;line-height:1.65}a{display:inline-block;margin-top:20px;border:1px solid #31ef9b;background:#123527;color:#31ef9b;text-decoration:none;border-radius:6px;padding:12px 18px;font-weight:700}.note{font-size:13px;color:#8da59c}form{display:grid;gap:12px;margin:24px 0;text-align:left}label{font-size:13px;color:#c9dfd3}input{width:100%;background:#07110e;color:#eaf7f1;border:1px solid #31584b;border-radius:6px;padding:13px;font:inherit}button{border:1px solid #31ef9b;background:#123527;color:#31ef9b;border-radius:6px;padding:12px 18px;font:inherit;font-weight:700;cursor:pointer}button:disabled{opacity:.55;cursor:not-allowed}.notice{min-height:24px;font-size:13px;line-height:1.5}.notice.error{color:#ffadad}.notice.success{color:#31ef9b}[hidden]{display:none!important}
 </style>
 </head>
 <body>
 <main class="panel">
-<h1>👽 MIS COMPRAS</h1>
-<p>Tu biblioteca digital privada de AREA 51.</p>
-<p>Estamos preparando el acceso seguro mediante un código enviado a tu correo electrónico.</p>
-<p class="note">Esta sección todavía no permite iniciar sesión ni consultar compras. No se procesan pagos ni se habilitan descargas.</p>
+<h1>👽 MIS COMPRAS</h1><p>Tu biblioteca digital privada de AREA 51.</p>
+<p class="note">🔐 Etapa de prueba: acceso exclusivo al correo autorizado. Sin pagos ni descargas.</p>
+<p id="status" class="notice" role="status" aria-live="polite">Comprobando sesión...</p>
+<section id="login" hidden>
+<form id="requestForm"><label for="email">Correo electrónico</label><input id="email" name="email" type="email" autocomplete="email" required value="area51.balcarce@gmail.com"><button type="submit">📧 Enviar código</button></form>
+<form id="verifyForm" hidden><label for="code">Código de seis dígitos</label><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="000000"><button type="submit">🔓 Ingresar a MIS COMPRAS</button></form>
+</section>
+<section id="logged" hidden><p>🛸 Sesión de prueba iniciada para:</p><strong id="account"></strong><p id="expiry" class="note"></p><p class="note">La biblioteca personal y sus descargas todavía no están habilitadas.</p><button id="logout" type="button">Cerrar sesión</button></section>
 <a href="/">← Volver al catálogo</a>
 </main>
-</body>
-</html>
+<script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id), status=$('status');
+function message(text,error=false){status.textContent=text;status.className='notice '+(error?'error':'success');}
+function view(session){$('login').hidden=!!session;$('logged').hidden=!session;if(session){$('account').textContent=session.email;$('expiry').textContent='La sesión vence: '+new Date(session.expiresAt).toLocaleString('es-AR');message('Acceso de prueba verificado correctamente.');}else{message('Ingresá tu correo para recibir un código de acceso.');}}
+async function api(path,options){const response=await fetch(path,{credentials:'same-origin',cache:'no-store',...options});let data;try{data=await response.json();}catch{throw new Error('El servidor no devolvió una respuesta válida.');}if(!response.ok)throw new Error(data.error||'No se pudo completar la operación.');return data;}
+async function refresh(){try{const session=await api('/api/mis-compras-session');view(session);}catch(e){if(e.message==='El servidor no devolvió una respuesta válida.')message(e.message,true);view(null);}}
+function busy(form,value){for(const button of form.querySelectorAll('button'))button.disabled=value;}
+$('requestForm').addEventListener('submit',async e=>{e.preventDefault();const form=e.currentTarget;busy(form,true);message('Enviando código...');try{await api('/api/request-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value.trim()})});$('verifyForm').hidden=false;message('Código enviado. Revisá tu correo (también spam).');$('code').focus();}catch(error){message(error.message,true);}finally{busy(form,false);}});
+$('verifyForm').addEventListener('submit',async e=>{e.preventDefault();const form=e.currentTarget;busy(form,true);message('Verificando código...');try{await api('/api/verify-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value.trim(),code:$('code').value.trim()})});$('code').value='';await refresh();}catch(error){message(error.message,true);}finally{busy(form,false);}});
+$('logout').addEventListener('click',async()=>{const btn=$('logout');btn.disabled=true;try{await api('/api/mis-compras-logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});$('verifyForm').hidden=true;view(null);}catch(error){message(error.message,true);}finally{btn.disabled=false;}});
+refresh();
+})();
+</script>
+</body></html>
