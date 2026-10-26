@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>👽 Mis Compras · AREA 51</title>
 <style>
-:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#070b0c;color:#eaf7f1;font-family:system-ui,-apple-system,Segoe UI,sans-serif;display:grid;place-items:center;padding:24px}.panel{width:min(520px,100%);border:1px solid #274139;background:#101918;border-radius:12px;padding:32px;text-align:center}h1{color:#31ef9b;margin:0 0 16px}p{color:#b2c8bc;line-height:1.65}a{display:inline-block;margin-top:20px;border:1px solid #31ef9b;background:#123527;color:#31ef9b;text-decoration:none;border-radius:6px;padding:12px 18px;font-weight:700}.note{font-size:13px;color:#8da59c}form{display:grid;gap:12px;margin:24px 0;text-align:left}label{font-size:13px;color:#c9dfd3}input{width:100%;background:#07110e;color:#eaf7f1;border:1px solid #31584b;border-radius:6px;padding:13px;font:inherit}button{border:1px solid #31ef9b;background:#123527;color:#31ef9b;border-radius:6px;padding:12px 18px;font:inherit;font-weight:700;cursor:pointer}button:disabled{opacity:.55;cursor:not-allowed}.notice{min-height:24px;font-size:13px;line-height:1.5}.notice.error{color:#ffadad}.notice.success{color:#31ef9b}[hidden]{display:none!important}
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#070b0c;color:#eaf7f1;font-family:system-ui,-apple-system,Segoe UI,sans-serif;display:grid;place-items:center;padding:24px}.panel{width:min(520px,100%);border:1px solid #274139;background:#101918;border-radius:12px;padding:32px;text-align:center}h1{color:#31ef9b;margin:0 0 16px}p{color:#b2c8bc;line-height:1.65}a{display:inline-block;margin-top:20px;border:1px solid #31ef9b;background:#123527;color:#31ef9b;text-decoration:none;border-radius:6px;padding:12px 18px;font-weight:700}.note{font-size:13px;color:#8da59c}form{display:grid;gap:12px;margin:24px 0;text-align:left}label{font-size:13px;color:#c9dfd3}input{width:100%;background:#07110e;color:#eaf7f1;border:1px solid #31584b;border-radius:6px;padding:13px;font:inherit}button{border:1px solid #31ef9b;background:#123527;color:#31ef9b;border-radius:6px;padding:12px 18px;font:inherit;font-weight:700;cursor:pointer}button:disabled{opacity:.55;cursor:not-allowed}.notice{min-height:24px;font-size:13px;line-height:1.5}.notice.error{color:#ffadad}.notice.success{color:#31ef9b}[hidden]{display:none!important}.library{margin-top:24px;text-align:left;border-top:1px solid #274139;padding-top:18px}.library h2{color:#31ef9b;font-size:19px}.library-list{display:grid;gap:10px}.library-item{border:1px solid #274139;border-radius:8px;padding:12px;background:#091310;display:flex;gap:12px;align-items:center}.library-item img{width:52px;height:78px;object-fit:cover;border-radius:4px}.library-item strong{display:block;overflow-wrap:anywhere}.library-item small{color:#8da59c}.library-item a{font-size:12px;margin-top:7px;padding:6px 10px}
 </style>
 </head>
 <body>
@@ -16,16 +16,37 @@
 <form id="requestForm"><label for="email">Correo electrónico</label><input id="email" name="email" type="email" autocomplete="email" required value="area51.balcarce@gmail.com"><button type="submit">📧 Enviar código</button></form>
 <form id="verifyForm" hidden><label for="code">Código de seis dígitos</label><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="000000"><button type="submit">🔓 Ingresar a MIS COMPRAS</button></form>
 </section>
-<section id="logged" hidden><p>🛸 Sesión de prueba iniciada para:</p><strong id="account"></strong><p id="expiry" class="note"></p><p class="note">La biblioteca personal y sus descargas todavía no están habilitadas.</p><button id="logout" type="button">Cerrar sesión</button></section>
+<section id="logged" hidden><p>🛸 Sesión de prueba iniciada para:</p><strong id="account"></strong><p id="expiry" class="note"></p><p class="note">Biblioteca de prueba: solo se muestran productos con compras pagadas registradas. Las descargas siguen deshabilitadas.</p><section id="library" class="library"><h2>🎮 Mis juegos y programas</h2><p id="libraryStatus" class="note" role="status">Consultando compras...</p><div id="libraryList" class="library-list"></div></section><button id="logout" type="button">Cerrar sesión</button></section>
 <a href="/">← Volver al catálogo</a>
 </main>
 <script>
 (()=>{'use strict';
 const $=id=>document.getElementById(id), status=$('status');
 function message(text,error=false){status.textContent=text;status.className='notice '+(error?'error':'success');}
-function view(session){$('login').hidden=!!session;$('logged').hidden=!session;if(session){$('account').textContent=session.email;$('expiry').textContent='La sesión vence: '+new Date(session.expiresAt).toLocaleString('es-AR');message('Acceso de prueba verificado correctamente.');}else{message('Ingresá tu correo para recibir un código de acceso.');}}
+let libraryRequest=0;
+function view(session){$('login').hidden=!!session;$('logged').hidden=!session;if(session){$('account').textContent=session.email;$('expiry').textContent='La sesión vence: '+new Date(session.expiresAt).toLocaleString('es-AR');message('Acceso de prueba verificado correctamente.');loadLibrary();}else{libraryRequest++;$('libraryList').replaceChildren();message('Ingresá tu correo para recibir un código de acceso.');}}
 async function api(path,options){const response=await fetch(path,{credentials:'same-origin',cache:'no-store',...options});let data;try{data=await response.json();}catch{throw new Error('El servidor no devolvió una respuesta válida.');}if(!response.ok)throw new Error(data.error||'No se pudo completar la operación.');return data;}
 async function refresh(){try{const session=await api('/api/mis-compras-session');view(session);}catch(e){if(e.message==='El servidor no devolvió una respuesta válida.')message(e.message,true);view(null);}}
+async function loadLibrary(){
+ const request=++libraryRequest;
+ const list=$('libraryList'), note=$('libraryStatus');
+ list.replaceChildren();note.textContent='Consultando compras...';
+ try{
+  const data=await api('/api/mis-compras-productos');
+  if(request!==libraryRequest)return;
+  if(!Array.isArray(data.products))throw new Error('Respuesta inesperada.');
+  if(!data.products.length){note.textContent='Todavía no tenés compras pagadas registradas en esta biblioteca.';return;}
+  note.textContent=data.products.length+' producto(s) adquirido(s). Descargas deshabilitadas durante las pruebas.';
+  for(const p of data.products){
+   const item=document.createElement('article');item.className='library-item';
+   // No se consulta Storage ni se muestran URLs privadas.
+   const info=document.createElement('div');const name=document.createElement('strong');name.textContent=p.name||'Producto';info.append(name);
+   const detail=document.createElement('small');detail.textContent='Compra registrada';info.append(detail);
+   if(typeof p.slug==='string'&&p.slug){const a=document.createElement('a');a.href='/producto/?slug='+encodeURIComponent(p.slug);a.textContent='Ver ficha pública';info.append(a);}
+   item.append(info);list.append(item);
+  }
+ }catch(error){if(request===libraryRequest)note.textContent='No pudimos consultar tus compras: '+error.message;}
+}
 function busy(form,value){for(const button of form.querySelectorAll('button'))button.disabled=value;}
 $('requestForm').addEventListener('submit',async e=>{e.preventDefault();const form=e.currentTarget;busy(form,true);message('Enviando código...');try{await api('/api/request-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value.trim()})});$('verifyForm').hidden=false;message('Código enviado. Revisá tu correo (también spam).');$('code').focus();}catch(error){message(error.message,true);}finally{busy(form,false);}});
 $('verifyForm').addEventListener('submit',async e=>{e.preventDefault();const form=e.currentTarget;busy(form,true);message('Verificando código...');try{await api('/api/verify-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value.trim(),code:$('code').value.trim()})});$('code').value='';await refresh();}catch(error){message(error.message,true);}finally{busy(form,false);}});
