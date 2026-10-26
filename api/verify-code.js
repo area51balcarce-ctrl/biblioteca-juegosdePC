@@ -1,6 +1,7 @@
 // AREA 51 — api/verify-code.js
-// PRUEBA CONTROLADA: verifica el código sin habilitar compras ni emitir sesiones.
+// PRUEBA CONTROLADA: verifica el código y crea una sesión temporal para MIS COMPRAS; no habilita compras.
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { makeSessionCookie, sameOrigin } from './_lib/a51-session.js';
 
 const TEST_EMAIL = 'area51.balcarce@gmail.com';
 const PURPOSE = 'checkout';
@@ -14,6 +15,7 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Allow', 'POST');
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Método no permitido.' });
+  if (!sameOrigin(req)) return res.status(403).json({ ok: false, error: 'Origen no autorizado.' });
   const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
   const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
   if (email !== TEST_EMAIL) return res.status(403).json({ ok: false, error: 'Correo de prueba no autorizado.' });
@@ -54,7 +56,8 @@ export default async function handler(req, res) {
     const changed = await update.json();
     if (!changed.length) return res.status(409).json({ ok: false, error: 'La verificación cambió. Volvé a intentarlo.' });
     if (!match) return res.status(400).json({ ok: false, error: 'Código incorrecto.' });
-    return res.status(200).json({ ok: true, message: 'Correo de prueba verificado correctamente.' });
+    res.setHeader('Set-Cookie', makeSessionCookie(email));
+    return res.status(200).json({ ok: true, message: 'Ingreso de prueba autorizado durante 15 minutos.' });
   } catch (e) {
     console.error('AREA51 verify-code:', e.message);
     return res.status(502).json({ ok: false, error: 'No se pudo comprobar el código.' });
