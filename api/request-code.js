@@ -14,10 +14,10 @@ function digest(email, code, secret) {
 function config() {
   const url = process.env.SUPABASE_URL?.replace(/\/$/, '');
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const resend = process.env.RESEND_API_KEY;
+  const brevo = process.env.BREVO_API_KEY;
   const secret = process.env.AREA51_EMAIL_CODE_SECRET;
-  if (!url || !key || !resend || !secret || secret.length < 32) return null;
-  return { url, key, resend, secret };
+  if (!url || !key || !brevo || !secret || secret.length < 32) return null;
+  return { url, key, brevo, secret };
 }
 function dbHeaders(key, extra = {}) {
   return { apikey: key, Authorization: `Bearer ${key}`, ...JSON_HEADERS, ...extra };
@@ -56,13 +56,14 @@ export default async function handler(req, res) {
     const id = records?.[0]?.id;
     if (!id) throw new Error('Missing inserted id');
 
-    const sent = await fetch('https://api.resend.com/emails', {
+    const sent = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${c.resend}`, ...JSON_HEADERS },
+      headers: { 'api-key': c.brevo, ...JSON_HEADERS, Accept: 'application/json' },
       body: JSON.stringify({
-        from: 'AREA 51 <onboarding@resend.dev>', to: [TEST_EMAIL],
+        sender: { name: 'AREA 51 - Biblioteca PC', email: TEST_EMAIL },
+        to: [{ email: TEST_EMAIL }],
         subject: 'AREA 51 - Código de verificación',
-        text: `Tu código de verificación de AREA 51 es: ${code}\n\nVence en ${EXPIRY_MINUTES} minutos. Si no lo solicitaste, ignorá este correo.`
+        textContent: `Tu código de verificación de AREA 51 es: ${code}\n\nVence en ${EXPIRY_MINUTES} minutos. Si no lo solicitaste, ignorá este correo.`
       }),
       signal: AbortSignal.timeout(12000)
     });
@@ -73,7 +74,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({ consumed_at: new Date().toISOString() }),
         signal: AbortSignal.timeout(5000)
       }).catch(() => {});
-      throw new Error(`resend ${sent.status}`);
+      throw new Error(`brevo ${sent.status}`);
     }
     return res.status(200).json({ ok: true, message: 'Código enviado al correo de prueba.' });
   } catch (e) {
