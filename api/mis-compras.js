@@ -34,6 +34,50 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // AREA 51 — Preparación de autorización de descargas (NO HABILITADA).
+  // Acción incorporada a la API existente para respetar el límite de Vercel Hobby.
+  // IMPORTANTE: no devolver URLs ni tokens de Storage desde esta acción.
+  if (action === 'descargas') {
+    res.setHeader('Allow', 'GET');
+    if (req.method !== 'GET') return res.status(405).json({ ok: false, error: 'Método no permitido.' });
+    const session = readSession(req);
+    if (!session) return res.status(401).json({ ok: false, error: 'Sesión no válida o vencida.' });
+    const productId = typeof req.query?.product_id === 'string' ? req.query.product_id : '';
+    if (!UUID.test(productId)) return res.status(400).json({ ok: false, error: 'Producto inválido.' });
+    const base = process.env.SUPABASE_URL?.replace(/\/$/, '');
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!base || !key) return res.status(503).json({ ok: false, error: 'Servicio no configurado.' });
+    try {
+      const entitlements = await rows(base, 'customer_entitlements', {
+        select: 'order_id', customer_email: `eq.${session.email}`,
+        product_id: `eq.${productId}`, revoked_at: 'is.null', limit: '201'
+      }, key);
+      if (entitlements.length > 200) throw new Error('Demasiados accesos para la consulta');
+      const orderIds = [...new Set(entitlements.map(x => x.order_id).filter(x => UUID.test(x || '')))];
+      if (orderIds.length) {
+        const orders = await rows(base, 'orders', {
+          select: 'id,payment_reference,payment_provider',
+          id: `in.(${orderIds.join(',')})`,
+          customer_email: `eq.${session.email}`, status: 'eq.paid', limit: '200'
+        }, key);
+        // Este análisis no otorga permisos: status=paid NO prueba un pago real.
+        // Las referencias AREA51-TEST-* nunca deben habilitar descargas.
+        const candidates = orders.filter(o =>
+          typeof o.payment_reference === 'string' &&
+          !o.payment_reference.startsWith('AREA51-TEST-') &&
+          typeof o.payment_provider === 'string' && o.payment_provider.length > 0
+        );
+        // Sin verificación independiente con el proveedor de pagos, denegar SIEMPRE.
+        void candidates;
+      }
+      return res.status(403).json({ ok: false, downloadsEnabled: false,
+        error: 'Descargas privadas todavía no habilitadas. No se realizó ninguna entrega.' });
+    } catch (error) {
+      console.error('AREA51 mis-compras-descargas:', error.message);
+      return res.status(502).json({ ok: false, error: 'No se pudo verificar la autorización.' });
+    }
+  }
+
   if (action !== 'productos') return res.status(404).json({ ok: false, error: 'Acción no encontrada.' });
   res.setHeader('Allow', 'GET');
   if (req.method !== 'GET') return res.status(405).json({ ok: false, error: 'Método no permitido.' });
