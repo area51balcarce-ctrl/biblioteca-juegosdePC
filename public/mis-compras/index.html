@@ -4,7 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>👽 Mis Compras · AREA 51</title>
 <style>
-:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#070b0c;color:#eaf7f1;font-family:system-ui,-apple-system,Segoe UI,sans-serif;display:grid;place-items:center;padding:24px}.panel{width:min(520px,100%);border:1px solid #274139;background:#101918;border-radius:12px;padding:32px;text-align:center}h1{color:#31ef9b;margin:0 0 16px}p{color:#b2c8bc;line-height:1.65}a{display:inline-block;margin-top:20px;border:1px solid #31ef9b;background:#123527;color:#31ef9b;text-decoration:none;border-radius:6px;padding:12px 18px;font-weight:700}.note{font-size:13px;color:#8da59c}form{display:grid;gap:12px;margin:24px 0;text-align:left}label{font-size:13px;color:#c9dfd3}input{width:100%;background:#07110e;color:#eaf7f1;border:1px solid #31584b;border-radius:6px;padding:13px;font:inherit}button{border:1px solid #31ef9b;background:#123527;color:#31ef9b;border-radius:6px;padding:12px 18px;font:inherit;font-weight:700;cursor:pointer}button:disabled{opacity:.55;cursor:not-allowed}.notice{min-height:24px;font-size:13px;line-height:1.5}.notice.error{color:#ffadad}.notice.success{color:#31ef9b}[hidden]{display:none!important}.library{margin-top:24px;text-align:left;border-top:1px solid #274139;padding-top:18px}.library h2{color:#31ef9b;font-size:19px}.library-list{display:grid;gap:10px}.library-item{border:1px solid #274139;border-radius:8px;padding:12px;background:#091310;display:flex;gap:12px;align-items:center}.library-item img{width:52px;height:78px;object-fit:cover;border-radius:4px}.library-item strong{display:block;overflow-wrap:anywhere}.library-item small{color:#8da59c}.library-item a{font-size:12px;margin-top:7px;padding:6px 10px}
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#070b0c;color:#eaf7f1;font-family:system-ui,-apple-system,Segoe UI,sans-serif;display:grid;place-items:center;padding:24px}.panel{width:min(520px,100%);border:1px solid #274139;background:#101918;border-radius:12px;padding:32px;text-align:center}h1{color:#31ef9b;margin:0 0 16px}p{color:#b2c8bc;line-height:1.65}a{display:inline-block;margin-top:20px;border:1px solid #31ef9b;background:#123527;color:#31ef9b;text-decoration:none;border-radius:6px;padding:12px 18px;font-weight:700}.note{font-size:13px;color:#8da59c}form{display:grid;gap:12px;margin:24px 0;text-align:left}label{font-size:13px;color:#c9dfd3}input{width:100%;background:#07110e;color:#eaf7f1;border:1px solid #31584b;border-radius:6px;padding:13px;font:inherit}button{border:1px solid #31ef9b;background:#123527;color:#31ef9b;border-radius:6px;padding:12px 18px;font:inherit;font-weight:700;cursor:pointer}button:disabled{opacity:.55;cursor:not-allowed}.notice{min-height:24px;font-size:13px;line-height:1.5}.notice.error{color:#ffadad}.notice.success{color:#31ef9b}[hidden]{display:none!important}.library{margin-top:24px;text-align:left;border-top:1px solid #274139;padding-top:18px}.library h2{color:#31ef9b;font-size:19px}.library-list{display:grid;gap:10px}.library-item{border:1px solid #274139;border-radius:8px;padding:12px;background:#091310;display:flex;gap:12px;align-items:center}.library-item img{width:52px;height:78px;object-fit:cover;border-radius:4px}.library-item strong{display:block;overflow-wrap:anywhere}.library-item small{color:#8da59c}.library-item a{font-size:12px;margin-top:7px;padding:6px 10px}.library-item .library-info{flex:1;min-width:0}.library-item .library-date{display:block;margin-top:5px}.library-cover-placeholder{width:52px;height:78px;flex:0 0 52px;border-radius:4px;border:1px solid #274139;background:#123527;display:grid;place-items:center;font-size:24px}.library-item img{flex:0 0 52px}.library-item a{display:inline-block}
 </style>
 </head>
 <body>
@@ -19,6 +19,7 @@
 <section id="logged" hidden><p>🛸 Sesión de prueba iniciada para:</p><strong id="account"></strong><p id="expiry" class="note"></p><p class="note">Biblioteca de prueba: solo se muestran productos con compras pagadas registradas. Las descargas siguen deshabilitadas.</p><section id="library" class="library"><h2>🎮 Mis juegos y programas</h2><p id="libraryStatus" class="note" role="status">Consultando compras...</p><div id="libraryList" class="library-list"></div></section><button id="logout" type="button">Cerrar sesión</button></section>
 <a href="/">← Volver al catálogo</a>
 </main>
+<script src="/assets/config.js"></script>
 <script>
 (()=>{'use strict';
 const $=id=>document.getElementById(id), status=$('status');
@@ -39,9 +40,22 @@ async function loadLibrary(){
   note.textContent=data.products.length+' producto(s) adquirido(s). Descargas deshabilitadas durante las pruebas.';
   for(const p of data.products){
    const item=document.createElement('article');item.className='library-item';
-   // No se consulta Storage ni se muestran URLs privadas.
-   const info=document.createElement('div');const name=document.createElement('strong');name.textContent=p.name||'Producto';info.append(name);
+   // Solo se utiliza la portada PUBLICA del bucket covers; nunca archivos privados.
+   const placeholder=document.createElement('span');placeholder.className='library-cover-placeholder';placeholder.textContent='🎮';placeholder.setAttribute('aria-hidden','true');
+   const base=typeof window.A51_SUPABASE_URL==='string'?window.A51_SUPABASE_URL.replace(/\/$/,''):'';
+   if(base && /^https:\/\/[^/]+$/.test(base) && typeof p.cover_path==='string' && p.cover_path && !p.cover_path.split('/').includes('..')){
+    const img=document.createElement('img');img.alt='Portada de '+(p.name||'producto');img.loading='lazy';img.decoding='async';
+    img.src=base+'/storage/v1/object/public/covers/'+p.cover_path.split('/').map(encodeURIComponent).join('/');
+    img.onerror=()=>img.replaceWith(placeholder);
+    item.append(img);
+   }else item.append(placeholder);
+   const info=document.createElement('div');info.className='library-info';
+   const name=document.createElement('strong');name.textContent=p.name||'Producto';info.append(name);
    const detail=document.createElement('small');detail.textContent='Compra registrada';info.append(detail);
+   if(typeof p.purchasedAt==='string'&&p.purchasedAt){
+    const d=new Date(p.purchasedAt);
+    if(!Number.isNaN(d.getTime())){const date=document.createElement('small');date.className='library-date';date.textContent='📅 Acceso registrado: '+d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});info.append(date);}
+   }
    if(typeof p.slug==='string'&&p.slug){const a=document.createElement('a');a.href='/producto/?slug='+encodeURIComponent(p.slug);a.textContent='Ver ficha pública';info.append(a);}
    item.append(info);list.append(item);
   }
