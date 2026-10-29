@@ -18,6 +18,71 @@ export default async function handler(req, res) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   const action = typeof req.query?.action === 'string' ? req.query.action : '';
 
+  // AREA 51 — Webhook Mercado Pago: confirmación automática sin sesión.
+  // La notificación es solo una pista: la fuente de verdad es la API de MP.
+  // Restricción temporal: vendedor de prueba verificado, no ventas reales.
+  if (action === 'mp-webhook') {
+    res.setHeader('Allow', 'POST');
+    if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Método no permitido.' });
+    const kind = String(req.body?.type || req.body?.topic || req.query?.type || req.query?.topic || '');
+    const paymentId = String(req.body?.data?.id || req.query?.['data.id'] || req.body?.id || '');
+    if (kind !== 'payment' || !/^[0-9]{1,24}$/.test(paymentId))
+      return res.status(200).json({ ok: true, ignored: true });
+    const base = process.env.SUPABASE_URL?.replace(/\/$/, '');
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const token = process.env.MERCADOPAGO_ACCESS_TOKEN_TEST?.trim();
+    if (!base || !key || !token) return res.status(503).json({ ok: false });
+    try {
+      const auth = { Authorization: 'Bearer ' + token, Accept: 'application/json' };
+      const [pr, sr] = await Promise.all([
+        fetch('https://api.mercadopago.com/v1/payments/' + paymentId,
+          { headers: auth, signal: AbortSignal.timeout(12000) }),
+        fetch('https://api.mercadopago.com/users/me',
+          { headers: auth, signal: AbortSignal.timeout(12000) })
+      ]);
+      if (!pr.ok || !sr.ok) throw new Error('No se pudo validar MP');
+      const [payment, seller] = await Promise.all([pr.json(), sr.json()]);
+      const orderId = String(payment?.external_reference || '');
+      const metadata = payment?.metadata || {};
+      if (!UUID.test(orderId) || String(payment?.id ?? '') !== paymentId ||
+          String(seller?.id ?? '') !== '3544226015' ||
+          String(payment?.collector_id ?? '') !== '3544226015' ||
+          !Array.isArray(seller?.tags) ||
+          !seller.tags.some(t => typeof t === 'string' && /test/i.test(t)) ||
+          metadata.area51_test !== true || String(metadata.order_id ?? '') !== orderId ||
+          payment?.status !== 'approved' || payment?.status_detail !== 'accredited') {
+        return res.status(200).json({ ok: true, ignored: true });
+      }
+      const orders = await rows(base, 'orders', {
+        select: 'id,status,total_ars,currency,customer_email,payment_provider,payment_reference',
+        id: 'eq.' + orderId, customer_email: 'eq.area51.balcarce@gmail.com', limit: '1'
+      }, key);
+      const order = orders[0];
+      if (!order || order.payment_provider !== 'mercadopago' || order.currency !== 'ARS' ||
+          payment.currency_id !== 'ARS' ||
+          !Number.isSafeInteger(payment.transaction_amount) ||
+          payment.transaction_amount !== order.total_ars ||
+          (order.payment_reference && order.payment_reference !== paymentId)) {
+        return res.status(200).json({ ok: true, ignored: true });
+      }
+      const used = await rows(base, 'orders', {
+        select: 'id', payment_reference: 'eq.' + paymentId,
+        id: 'neq.' + order.id, limit: '1'
+      }, key);
+      if (used.length) return res.status(200).json({ ok: true, ignored: true });
+      const rpc = await fetch(base + '/rest/v1/rpc/a51_confirm_paid_order', {
+        method: 'POST', headers: { ...headers(key), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_order_id: order.id, p_payment_reference: paymentId }),
+        signal: AbortSignal.timeout(12000)
+      });
+      if (!rpc.ok) throw new Error('RPC de acreditación HTTP ' + rpc.status);
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      console.error('AREA51 mp-webhook:', error.message);
+      return res.status(502).json({ ok: false, error: 'Reintentar notificación.' });
+    }
+  }
+
   // AREA 51 — ETAPA 2: verificación de pago SOLO LECTURA.
   // Nueva acción dentro de la función existente para respetar Vercel Hobby.
   // No modifica pedidos ni habilita descargas.
