@@ -65,23 +65,36 @@ export default async function handler(req, res) {
       'https://api.mercadopago.com/v1/payments/' + encodeURIComponent(paymentId),
       { Authorization: 'Bearer ' + mpToken, Accept: 'application/json' }, 15000
     );
-    const verified = payment?.status === 'approved' &&
-      String(payment.id) === paymentId &&
-      payment.external_reference === order.id &&
-      order.currency === 'ARS' && payment.currency_id === order.currency &&
-      Number.isSafeInteger(payment.transaction_amount) &&
-      payment.transaction_amount === order.total_ars &&
-      String(payment.payer?.email || '').trim().toLowerCase() === session.email &&
-      (!order.payment_reference || order.payment_reference === paymentId);
+    // ETAPA 3: comparación detallada sin exponer datos personales del comprador.
+    // En sandbox, el correo del comprador de prueba puede ser distinto al del
+    // propietario del pedido. No se omiten controles de referencia, monto ni moneda.
+    const checks = {
+      approved: payment?.status === 'approved',
+      payment_id: String(payment?.id ?? '') === paymentId,
+      order_reference: payment?.external_reference === order.id,
+      currency: order.currency === 'ARS' && payment?.currency_id === order.currency,
+      amount: Number.isSafeInteger(payment?.transaction_amount) &&
+        payment.transaction_amount === order.total_ars,
+      order_payment_reference: !order.payment_reference || order.payment_reference === paymentId,
+      sandbox: payment?.live_mode === false,
+      payer_email_matches_session:
+        String(payment?.payer?.email || '').trim().toLowerCase() === session.email
+    };
+    // Esta API utiliza EXCLUSIVAMENTE el token de prueba y la sesión de prueba.
+    // La coincidencia del email se informa, pero no bloquea pagos sandbox.
+    // Un pago real (live_mode=true) jamás puede verificarse por esta ruta.
+    const verified = checks.approved && checks.payment_id &&
+      checks.order_reference && checks.currency && checks.amount &&
+      checks.order_payment_reference && checks.sandbox;
 
     return res.status(200).json({
-      ok: true, testMode: true, verified,
+      ok: true, testMode: true, verified, checks,
       payment_status: typeof payment.status === 'string' ? payment.status : 'unknown',
       order_status: order.status, order_id: order.id,
       writesPerformed: false, downloadsEnabled: false,
       message: verified
-        ? 'Pago verificado en modo lectura. El pedido permanece pendiente y sin descargas.'
-        : 'Pago no aprobado o datos inconsistentes. El pedido permanece pendiente.'
+        ? 'Pago sandbox verificado en modo lectura. El pedido permanece pendiente y sin descargas.'
+        : 'Una o más comprobaciones no coinciden. El pedido permanece pendiente.'
     });
   } catch (error) {
     console.error('AREA51 verificar-pago:', error.message);
