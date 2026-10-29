@@ -283,6 +283,77 @@ export default async function handler(req, res) {
     }
   }
 
+  // AREA 51 — Confirmación atómica de pago de PRUEBA, exclusivamente del vendedor
+  // TESTUSER verificado en Mercado Pago Developers. No usa live_mode como único
+  // indicador: Checkout Pro puede registrar pagos de cuentas test en entorno live.
+  if (action === 'confirmar-pago') {
+    res.setHeader('Allow', 'POST');
+    if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Método no permitido.' });
+    if (!sameOrigin(req)) return res.status(403).json({ ok: false, error: 'Origen no autorizado.' });
+    const session = readSession(req);
+    if (!session || session.email !== 'area51.balcarce@gmail.com')
+      return res.status(401).json({ ok: false, error: 'Sesión de pruebas requerida.' });
+    const orderId = typeof req.body?.order_id === 'string' ? req.body.order_id.trim() : '';
+    const paymentId = typeof req.body?.payment_id === 'string' ? req.body.payment_id.trim() : '';
+    if (!UUID.test(orderId) || !/^[0-9]{1,24}$/.test(paymentId))
+      return res.status(400).json({ ok: false, error: 'Identificadores inválidos.' });
+    const base = process.env.SUPABASE_URL?.replace(/\/$/, '');
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const token = process.env.MERCADOPAGO_ACCESS_TOKEN_TEST?.trim();
+    if (!base || !key || !token) return res.status(503).json({ ok: false, error: 'Servicio no configurado.' });
+    try {
+      const orders = await rows(base, 'orders', {
+        select: 'id,status,total_ars,currency,customer_email,payment_provider,payment_reference',
+        id: 'eq.' + orderId, customer_email: 'eq.' + session.email, limit: '1'
+      }, key);
+      const order = orders[0];
+      if (!order || order.payment_provider !== 'mercadopago')
+        return res.status(404).json({ ok: false, error: 'Pedido no encontrado.' });
+      if (order.status !== 'pending' && !(order.status === 'paid' && order.payment_reference === paymentId))
+        return res.status(409).json({ ok: false, error: 'Estado del pedido incompatible.' });
+      const mh = { Authorization: 'Bearer ' + token, Accept: 'application/json' };
+      const [pr, sr] = await Promise.all([
+        fetch('https://api.mercadopago.com/v1/payments/' + paymentId, { headers: mh, signal: AbortSignal.timeout(15000) }),
+        fetch('https://api.mercadopago.com/users/me', { headers: mh, signal: AbortSignal.timeout(15000) })
+      ]);
+      if (!pr.ok || !sr.ok) throw new Error('Verificación de Mercado Pago fallida');
+      const [payment, seller] = await Promise.all([pr.json(), sr.json()]);
+      const metadata = payment?.metadata || {};
+      const verified = String(seller?.id ?? '') === '3544226015' &&
+        String(payment?.collector_id ?? '') === '3544226015' &&
+        Array.isArray(seller?.tags) && seller.tags.some(t => typeof t === 'string' && /test/i.test(t)) &&
+        payment?.status === 'approved' && payment?.status_detail === 'accredited' &&
+        String(payment?.id ?? '') === paymentId &&
+        payment?.external_reference === order.id &&
+        metadata.area51_test === true && String(metadata.order_id ?? '') === order.id &&
+        payment?.currency_id === 'ARS' && order.currency === 'ARS' &&
+        Number.isSafeInteger(payment?.transaction_amount) &&
+        payment.transaction_amount === order.total_ars &&
+        (!order.payment_reference || order.payment_reference === paymentId);
+      if (!verified) return res.status(403).json({
+        ok: false, verified: false, error: 'Pago de prueba no validado; no se acreditó el pedido.'
+      });
+      const alreadyUsed = await rows(base, 'orders', {
+        select: 'id', payment_reference: 'eq.' + paymentId, id: 'neq.' + order.id, limit: '1'
+      }, key);
+      if (alreadyUsed.length) return res.status(409).json({ ok: false, error: 'Pago vinculado a otro pedido.' });
+      const rpc = await fetch(base + '/rest/v1/rpc/a51_confirm_paid_order', {
+        method: 'POST', headers: { ...headers(key), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_order_id: order.id, p_payment_reference: paymentId }),
+        signal: AbortSignal.timeout(12000)
+      });
+      if (!rpc.ok) throw new Error('Acreditación transaccional HTTP ' + rpc.status);
+      const result = await rpc.json();
+      return res.status(200).json({
+        ok: result?.ok === true, verified: true, order_id: order.id,
+        already_paid: result?.already_paid === true, downloadsEnabled: result?.ok === true
+      });
+    } catch (error) {
+      console.error('AREA51 confirmar-pago:', error.message);
+      return res.status(502).json({ ok: false, error: 'No se pudo acreditar el pago de prueba.' });
+    }
+  }
+
   if (action === 'session') {
     res.setHeader('Allow', 'GET');
     if (req.method !== 'GET') return res.status(405).json({ ok: false, error: 'Método no permitido.' });
