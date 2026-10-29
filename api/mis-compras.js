@@ -376,8 +376,16 @@ export default async function handler(req, res) {
       });
       if (!response.ok) throw new Error('Mercado Pago HTTP ' + response.status);
       const payment = await response.json();
+      const sellerResponse = await fetch('https://api.mercadopago.com/users/me', {
+        headers: { Authorization: 'Bearer ' + mpToken, Accept: 'application/json' },
+        signal: AbortSignal.timeout(15000)
+      });
+      if (!sellerResponse.ok) throw new Error('Identidad de vendedor HTTP ' + sellerResponse.status);
+      const seller = await sellerResponse.json();
+      const sellerMatches = Boolean(seller?.id && payment?.collector_id &&
+        String(seller.id) === String(payment.collector_id));
       // Nunca habilitar esta ruta de TEST para un pago reportado como real.
-      const valid = payment?.status === 'approved' && payment?.live_mode === false &&
+      const valid = sellerMatches && payment?.status === 'approved' && payment?.live_mode === false &&
         String(payment?.id ?? '') === order.payment_reference &&
         payment?.external_reference === order.id && payment?.currency_id === order.currency &&
         order.currency === 'ARS' && Number.isSafeInteger(payment?.transaction_amount) &&
