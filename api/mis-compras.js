@@ -92,6 +92,87 @@ export default async function handler(req, res) {
   }
   }
 
+  // AREA 51 — DIAGNÓSTICO: buscar pagos del pedido (SOLO LECTURA).
+  // No modifica Supabase, no confirma compras ni habilita descargas.
+  if (action === 'diagnosticar-pago') {
+    res.setHeader('Allow', 'POST');
+    if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Método no permitido.' });
+    if (!sameOrigin(req)) return res.status(403).json({ ok: false, error: 'Origen no autorizado.' });
+    const session = readSession(req);
+    if (!session || session.email !== 'area51.balcarce@gmail.com') {
+      return res.status(401).json({ ok: false, error: 'Iniciá sesión en Mis Compras.' });
+    }
+    const orderId = typeof req.body?.order_id === 'string' ? req.body.order_id.trim() : '';
+    if (!UUID.test(orderId)) return res.status(400).json({ ok: false, error: 'Pedido inválido.' });
+
+    const base = process.env.SUPABASE_URL?.replace(/\/$/, '');
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const mpToken = process.env.MERCADOPAGO_ACCESS_TOKEN_TEST?.trim();
+    if (!base || !key || !mpToken) {
+      return res.status(503).json({ ok: false, error: 'Configuración incompleta.' });
+    }
+    try {
+      const orders = await rows(base, 'orders', {
+        select: 'id,status,total_ars,currency,payment_provider',
+        id: `eq.${orderId}`, customer_email: `eq.${session.email}`, limit: '1'
+      }, key);
+      const order = orders[0];
+      if (!order || order.payment_provider !== 'mercadopago') {
+        return res.status(404).json({ ok: false, error: 'Pedido de prueba no encontrado.' });
+      }
+
+      // Mercado Pago: buscar exclusivamente pagos asociados a external_reference.
+      // Nunca se devuelve el token ni datos personales del comprador.
+      const url = new URL('https://api.mercadopago.com/v1/payments/search');
+      url.searchParams.set('external_reference', order.id);
+      url.searchParams.set('limit', '20');
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${mpToken}`, Accept: 'application/json' },
+        signal: AbortSignal.timeout(15000)
+      });
+      if (!response.ok) {
+        console.error('AREA51 diagnosticar-pago: Mercado Pago HTTP', response.status);
+        return res.status(502).json({
+          ok: false, error: 'Mercado Pago no respondió correctamente a la consulta.',
+          provider_http_status: response.status,
+          writesPerformed: false, downloadsEnabled: false
+        });
+      }
+      const data = await response.json();
+      if (!Array.isArray(data?.results)) throw new Error('Formato inesperado de respuesta de Mercado Pago');
+
+      // Defensa adicional: nunca informar un pago de otro pedido.
+      const payments = data.results
+        .filter(p => p && p.external_reference === order.id)
+        .slice(0, 20)
+        .map(p => ({
+          payment_id: String(p.id ?? ''),
+          status: typeof p.status === 'string' ? p.status : 'unknown',
+          status_detail: typeof p.status_detail === 'string' ? p.status_detail : null,
+          amount_ars: typeof p.transaction_amount === 'number' ? p.transaction_amount : null,
+          currency: typeof p.currency_id === 'string' ? p.currency_id : null,
+          created_at: typeof p.date_created === 'string' ? p.date_created : null
+        }));
+
+      return res.status(200).json({
+        ok: true, testMode: true,
+        order_id: order.id, order_status: order.status,
+        expected_amount_ars: order.total_ars, expected_currency: order.currency,
+        payments_found: payments.length, payments,
+        writesPerformed: false, downloadsEnabled: false,
+        message: payments.length
+          ? 'Se encontraron pagos asociados al pedido. Ningún estado fue modificado.'
+          : 'No se encontraron pagos asociados al pedido en esta consulta.'
+      });
+    } catch (error) {
+      console.error('AREA51 diagnosticar-pago:', error.message);
+      return res.status(502).json({
+        ok: false, error: 'No se pudo completar el diagnóstico.',
+        writesPerformed: false, downloadsEnabled: false
+      });
+    }
+  }
+
   if (action === 'session') {
     res.setHeader('Allow', 'GET');
     if (req.method !== 'GET') return res.status(405).json({ ok: false, error: 'Método no permitido.' });
