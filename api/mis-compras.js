@@ -339,6 +339,49 @@ export default async function handler(req, res) {
     }
   }
 
+  // AREA 51 — ETAPA 12: consulta de enlaces del ADMIN, autorizada por compra.
+  // No altera el admin. No confía en el ID de pedido ni en el email del navegador.
+  // El bloqueo de pago de prueba permanece vigente: no libera enlaces de pruebas.
+  if (action === 'enlaces-comprados') {
+    res.setHeader('Allow', 'GET');
+    if (req.method !== 'GET') return res.status(405).json({ ok: false, error: 'Método no permitido.' });
+    const session = readSession(req);
+    if (!session) return res.status(401).json({ ok: false, error: 'Sesión no válida.' });
+    const productId = typeof req.query?.product_id === 'string' ? req.query.product_id : '';
+    if (!UUID.test(productId)) return res.status(400).json({ ok: false, error: 'Producto inválido.' });
+    const base = process.env.SUPABASE_URL?.replace(/\\/$/, '');
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!base || !key) return res.status(503).json({ ok: false, error: 'Servicio no configurado.' });
+    try {
+      const entitlements = await rows(base, 'customer_entitlements', {
+        select: 'order_id', customer_email: 'eq.' + session.email,
+        product_id: 'eq.' + productId, revoked_at: 'is.null', limit: '2'
+      }, key);
+      if (entitlements.length !== 1 || !UUID.test(entitlements[0].order_id || '')) {
+        return res.status(403).json({ ok: false, error: 'No tenés acceso a este producto.' });
+      }
+      const orders = await rows(base, 'orders', {
+        select: 'id,payment_reference,payment_provider',
+        id: 'eq.' + entitlements[0].order_id, customer_email: 'eq.' + session.email,
+        status: 'eq.paid', limit: '1'
+      }, key);
+      const order = orders[0];
+      if (!order || order.payment_provider !== 'mercadopago' ||
+          !/^[0-9]{1,24}$/.test(order.payment_reference || '')) {
+        return res.status(403).json({ ok: false, error: 'Compra no acreditada.' });
+      }
+      // No alcanza con status=paid: la entrega necesita además una validación
+      // independiente y persistente del pago, todavía pendiente de habilitar.
+      return res.status(403).json({
+        ok: false, downloadsEnabled: false,
+        error: 'Enlaces del administrador preparados; entrega pendiente de validación final del pago.'
+      });
+    } catch (error) {
+      console.error('AREA51 enlaces-comprados:', error.message);
+      return res.status(502).json({ ok: false, error: 'No se pudo validar el acceso.' });
+    }
+  }
+
   if (action !== 'productos') return res.status(404).json({ ok: false, error: 'Acción no encontrada.' });
   res.setHeader('Allow', 'GET');
   if (req.method !== 'GET') return res.status(405).json({ ok: false, error: 'Método no permitido.' });
