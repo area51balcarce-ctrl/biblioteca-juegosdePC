@@ -23,7 +23,7 @@ a{color:inherit;text-decoration:none}button,input,select{font:inherit}button{cur
 <section class="shop-wrap" aria-label="Catálogo"><div class="shop-controls"><label class="shop-sr-only" for="search">Buscar productos</label><input id="search" type="search" placeholder="Buscar juegos o programas..." autocomplete="off"><label class="shop-sr-only" for="category">Filtrar categoría</label><select id="category"><option value="">Todas las categorías</option></select><label class="shop-sr-only" for="sort">Ordenar productos</label><select id="sort"><option value="name">Nombre A–Z</option><option value="price_asc">Menor precio</option><option value="price_desc">Mayor precio</option></select></div><p id="status" class="shop-info" role="status">Cargando catálogo...</p><div id="grid" class="shop-grid"></div><div id="empty" class="shop-empty" hidden>No se encontraron productos con esos filtros.</div></section>
 </main>
 <footer class="shop-footer"><div class="shop-wrap">🛸 ÁREA 51 · 👽 TE ABDUCE A LA TECNOLOGÍA · Productos digitales sujetos a disponibilidad y autorización de distribución.</div></footer>
-<div id="cartBackdrop" class="shop-drawer-backdrop" aria-hidden="true"></div><aside id="cartDrawer" class="shop-drawer" role="dialog" aria-modal="true" aria-label="Carrito de compras" aria-hidden="true"><div class="shop-drawer-head"><strong>🛒 Tu carrito</strong><button id="closeCart" type="button" class="shop-btn secondary">Cerrar ✕</button></div><div class="shop-drawer-content" id="cartItems"></div><div class="shop-cart-footer"><div class="shop-total"><span>Total estimado</span><span id="cartTotal">$ 0</span></div><button class="shop-btn full" disabled type="button">Compra online próximamente</button><p class="shop-note">No se procesan pagos todavía. Los precios definitivos y la disponibilidad se verificarán en el servidor al habilitar las compras.</p></div></aside>
+<div id="cartBackdrop" class="shop-drawer-backdrop" aria-hidden="true"></div><aside id="cartDrawer" class="shop-drawer" role="dialog" aria-modal="true" aria-label="Carrito de compras" aria-hidden="true"><div class="shop-drawer-head"><strong>🛒 Tu carrito</strong><button id="closeCart" type="button" class="shop-btn secondary">Cerrar ✕</button></div><div class="shop-drawer-content" id="cartItems"></div><div class="shop-cart-footer"><div class="shop-total"><span>Total estimado</span><span id="cartTotal">$ 0</span></div><button class="shop-btn full" disabled type="button">Compra online próximamente</button><button id="testCheckoutButton" class="shop-btn full" type="button" hidden>🧪 Pagar compra de prueba con Mercado Pago</button><p id="testCheckoutStatus" class="shop-note" role="status" aria-live="polite" hidden></p><p class="shop-note">No se procesan pagos todavía. Los precios definitivos y la disponibilidad se verificarán en el servidor al habilitar las compras.</p></div></aside>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="/assets/config.js"></script>
 <script src="/assets/store.js"></script>
@@ -48,7 +48,30 @@ function updateCart(){
  const items=cartProducts();if(!items.length){container.append(el('p','shop-note','Tu carrito está vacío. Elegí productos desde el catálogo.'));}
  for(const p of items){const line=el('div','shop-cart-item');const info=el('div');info.append(el('strong','',p.name),el('small','',money(priceOf(p))));const remove=el('button','shop-btn secondary','Quitar');remove.type='button';remove.addEventListener('click',()=>{state.cart.delete(p.id);persist();updateCart();render();});line.append(info,remove);container.append(line);}
  setText($('cartTotal'),money(items.reduce((sum,p)=>sum+priceOf(p),0)));
+ // Pruebas aisladas: una sola unidad por pedido, sin alterar el carrito comercial.
+ $('testCheckoutButton').hidden=items.length!==1;
+ $('testCheckoutButton').disabled=items.length!==1;
 }
+// Área 51 — Checkout Pro de PRUEBA aislado; el servidor determina el precio.
+$('testCheckoutButton').addEventListener('click',async()=>{
+ const items=cartProducts(),button=$('testCheckoutButton'),note=$('testCheckoutStatus');
+ if(items.length!==1){note.hidden=false;note.textContent='Para la prueba seleccioná un solo juego.';return;}
+ const product=items[0];
+ if(!confirm('¿Iniciar una COMPRA DE PRUEBA de '+product.name+'?\\nEl importe se verificará en el servidor.'))return;
+ button.disabled=true;note.hidden=false;note.textContent='Preparando Mercado Pago de prueba...';
+ try{
+  const response=await fetch('/api/crear-preferencia',{
+   method:'POST',credentials:'same-origin',cache:'no-store',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({email:'area51.balcarce@gmail.com',product_id:product.id})
+  });
+  const data=await response.json();
+  if(!response.ok||data.ok!==true||typeof data.sandbox_url!=='string'||
+     !data.sandbox_url.startsWith('https://'))throw new Error(data.error||'No se pudo iniciar la prueba.');
+  note.textContent='Abriendo el pago de prueba...';
+  window.location.assign(data.sandbox_url);
+ }catch(error){note.textContent='No se inició la compra: '+error.message;button.disabled=false;}
+});
 function render(){
  const q=$('search').value.trim().toLocaleLowerCase('es-AR');const category=$('category').value;const sort=$('sort').value;
  const products=state.products.filter(p=>(!category||p.category_id===category)&&(!q||(p.name+' '+p.category_name).toLocaleLowerCase('es-AR').includes(q)));
