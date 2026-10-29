@@ -65,6 +65,21 @@ export default async function handler(req, res) {
       'https://api.mercadopago.com/v1/payments/' + encodeURIComponent(paymentId),
       { Authorization: 'Bearer ' + mpToken, Accept: 'application/json' }, 15000
     );
+    // AREA 51 ETAPA 5: identidad del vendedor, solo lectura.
+    let sellerIdentity = { checked: false, matches_payment: false, error: null };
+    try {
+      const seller = await getJSON('https://api.mercadopago.com/users/me',
+        { Authorization: 'Bearer ' + mpToken, Accept: 'application/json' }, 15000);
+      const sellerId = String(seller?.id ?? '');
+      const collectorId = String(payment?.collector_id ?? '');
+      sellerIdentity = {
+        checked: Boolean(sellerId && collectorId),
+        matches_payment: Boolean(sellerId && collectorId && sellerId === collectorId),
+        error: null
+      };
+    } catch (_) {
+      sellerIdentity = { checked: false, matches_payment: false, error: 'Consulta de vendedor no disponible.' };
+    }
     // ETAPA 3: comparación detallada sin exponer datos personales del comprador.
     // En sandbox, el correo del comprador de prueba puede ser distinto al del
     // propietario del pedido. No se omiten controles de referencia, monto ni moneda.
@@ -90,6 +105,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true, testMode: true, verified, checks,
       payment_status: typeof payment.status === 'string' ? payment.status : 'unknown',
+      seller_identity: sellerIdentity,
       // Solo diagnóstico de tipo y valor: sin emails, tokens ni datos personales.
       payment_environment: {
         live_mode_type: typeof payment?.live_mode,
