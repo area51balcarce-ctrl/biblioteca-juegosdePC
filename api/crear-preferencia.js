@@ -126,7 +126,8 @@ export default async function handler(req, res) {
           failure: SITE_ORIGIN,
           pending: SITE_ORIGIN
         },
-        metadata: { area51_test: true, order_id: orderId }
+        metadata: { area51_test: true, order_id: orderId },
+        notification_url: SITE_ORIGIN + '/api/mis-compras?action=mp-webhook'
       }),
       signal: AbortSignal.timeout(15000)
     });
