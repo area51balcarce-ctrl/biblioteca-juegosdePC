@@ -1,4 +1,4 @@
--- AREA 51 / ETAPA 10 — PREPARADO, NO APLICADO
+-- AREA 51 / ETAPA 10 — FUNCIÓN TRANSACCIONAL (instalar sin invocar)
 -- Aplicar únicamente cuando el backend valide el pago y su entorno.
 -- No llamar desde el navegador. La API debe usar exclusivamente service_role.
 -- Operación atómica: todo se confirma o todo se revierte.
@@ -53,24 +53,16 @@ begin
     raise exception 'Productos e importe del pedido no coinciden';
   end if;
 
-  -- No confirmar una compra que dejaría un acceso previamente revocado
-  -- sin restaurar. Esa situación requiere una política de restitución explícita.
-  if exists (
-    select 1 from public.order_items i
-    join public.customer_entitlements e
-      on e.product_id = i.product_id and e.customer_email = v_order.customer_email
-    where i.order_id = p_order_id and e.revoked_at is not null
-  ) then
-    raise exception 'Acceso revocado: requiere revisión antes de acreditar';
-  end if;
-
-  -- Si ya existe acceso al mismo producto por otra compra, no lo reemplazamos.
-  -- El pedido igualmente queda registrado; la unicidad evita accesos duplicados.
+  -- Una compra nueva puede rehabilitar un acceso revocado de una prueba anterior.
+  -- Se conserva el ID del acceso, se reasigna al pedido NUEVO verificado
+  -- y se elimina la revocación. No se crean accesos duplicados.
   insert into public.customer_entitlements(customer_email,product_id,order_id)
   select v_order.customer_email,i.product_id,p_order_id
   from public.order_items i
   where i.order_id = p_order_id
-  on conflict (customer_email,product_id) do nothing;
+  on conflict (customer_email,product_id) do update
+    set order_id = excluded.order_id, revoked_at = null, granted_at = now()
+    where public.customer_entitlements.revoked_at is not null;
 
   get diagnostics v_granted = row_count;
 
