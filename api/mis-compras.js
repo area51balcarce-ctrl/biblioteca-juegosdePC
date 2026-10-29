@@ -138,11 +138,23 @@ export default async function handler(req, res) {
       const entitlements = await rows(base, 'customer_entitlements', {
         select: 'product_id', order_id: 'eq.' + order.id
       }, key);
+      // ETAPA 11: detectar accesos del mismo cliente y producto, incluso
+      // si fueron concedidos por otro pedido. Solo lectura.
+      const itemIds = [...new Set(items.map(i => i.product_id).filter(id => UUID.test(id || '')))];
+      const previousAccess = itemIds.length
+        ? await rows(base, 'customer_entitlements', {
+            select: 'product_id,revoked_at',
+            customer_email: 'eq.' + session.email,
+            product_id: 'in.(' + itemIds.join(',') + ')'
+          }, key)
+        : [];
       const total = items.reduce((sum, item) => sum + Number(item.quantity) * Number(item.unit_price_ars), 0);
       fulfillmentReadiness = {
         checked: true,
         item_count: items.length,
         existing_entitlements: entitlements.length,
+        existing_active_for_products: previousAccess.filter(a => a.revoked_at === null).length,
+        existing_revoked_for_products: previousAccess.filter(a => a.revoked_at !== null).length,
         items_total_matches: Number.isSafeInteger(total) && total === order.total_ars,
         eligible_for_write: false,
         error: null
