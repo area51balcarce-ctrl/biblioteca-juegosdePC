@@ -90,6 +90,12 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true, testMode: true, verified, checks,
       payment_status: typeof payment.status === 'string' ? payment.status : 'unknown',
+      // Solo diagnóstico de tipo y valor: sin emails, tokens ni datos personales.
+      payment_environment: {
+        live_mode_type: typeof payment?.live_mode,
+        live_mode_value: typeof payment?.live_mode === 'boolean' ? payment.live_mode : null,
+        live_mode_present: Object.prototype.hasOwnProperty.call(payment || {}, 'live_mode')
+      },
       order_status: order.status, order_id: order.id,
       writesPerformed: false, downloadsEnabled: false,
       message: verified
