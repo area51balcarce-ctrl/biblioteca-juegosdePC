@@ -127,6 +127,30 @@ export default async function handler(req, res) {
       requires_manual_environment_review: payment?.live_mode !== false
     };
 
+    // ETAPA 9: preflight de entrega, estrictamente SOLO LECTURA.
+    // Inspecciona los items y accesos actuales; no acredita ni entrega.
+    let fulfillmentReadiness = { checked: false, item_count: 0,
+      existing_entitlements: 0, eligible_for_write: false, error: null };
+    try {
+      const items = await rows(base, 'order_items', {
+        select: 'product_id,quantity,unit_price_ars', order_id: 'eq.' + order.id
+      }, key);
+      const entitlements = await rows(base, 'customer_entitlements', {
+        select: 'product_id', order_id: 'eq.' + order.id
+      }, key);
+      const total = items.reduce((sum, item) => sum + Number(item.quantity) * Number(item.unit_price_ars), 0);
+      fulfillmentReadiness = {
+        checked: true,
+        item_count: items.length,
+        existing_entitlements: entitlements.length,
+        items_total_matches: Number.isSafeInteger(total) && total === order.total_ars,
+        eligible_for_write: false,
+        error: null
+      };
+    } catch (_) {
+      fulfillmentReadiness.error = 'No se pudo completar la inspección de entrega.';
+    }
+
     return res.status(200).json({
       ok: true, testMode: true, verified, checks,
       payment_status: typeof payment.status === 'string' ? payment.status : 'unknown',
@@ -134,6 +158,7 @@ export default async function handler(req, res) {
       payment_integrity: { passed: paymentIntegrity, seller_checked: sellerIdentity.checked },
       environment_classification: environmentClassification,
       checkout_test_evidence: checkoutTestEvidence,
+      fulfillment_readiness: fulfillmentReadiness,
       // Solo diagnóstico de tipo y valor: sin emails, tokens ni datos personales.
       payment_environment: {
         live_mode_type: typeof payment?.live_mode,
