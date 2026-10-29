@@ -339,9 +339,8 @@ export default async function handler(req, res) {
     }
   }
 
-  // AREA 51 — ETAPA 12: consulta de enlaces del ADMIN, autorizada por compra.
-  // No altera el admin. No confía en el ID de pedido ni en el email del navegador.
-  // El bloqueo de pago de prueba permanece vigente: no libera enlaces de pruebas.
+  // AREA 51 — entrega segura de enlaces configurados en el ADMIN.
+  // El servidor consulta Mercado Pago en CADA solicitud; no confía solo en Supabase.
   if (action === 'enlaces-comprados') {
     res.setHeader('Allow', 'GET');
     if (req.method !== 'GET') return res.status(405).json({ ok: false, error: 'Método no permitido.' });
@@ -349,9 +348,10 @@ export default async function handler(req, res) {
     if (!session) return res.status(401).json({ ok: false, error: 'Sesión no válida.' });
     const productId = typeof req.query?.product_id === 'string' ? req.query.product_id : '';
     if (!UUID.test(productId)) return res.status(400).json({ ok: false, error: 'Producto inválido.' });
-    const base = process.env.SUPABASE_URL?.replace(/\\/$/, '');
+    const base = process.env.SUPABASE_URL?.replace(/\/$/, '');
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!base || !key) return res.status(503).json({ ok: false, error: 'Servicio no configurado.' });
+    const mpToken = process.env.MERCADOPAGO_ACCESS_TOKEN_TEST?.trim();
+    if (!base || !key || !mpToken) return res.status(503).json({ ok: false, error: 'Servicio no configurado.' });
     try {
       const entitlements = await rows(base, 'customer_entitlements', {
         select: 'order_id', customer_email: 'eq.' + session.email,
@@ -361,7 +361,7 @@ export default async function handler(req, res) {
         return res.status(403).json({ ok: false, error: 'No tenés acceso a este producto.' });
       }
       const orders = await rows(base, 'orders', {
-        select: 'id,payment_reference,payment_provider',
+        select: 'id,payment_reference,payment_provider,total_ars,currency',
         id: 'eq.' + entitlements[0].order_id, customer_email: 'eq.' + session.email,
         status: 'eq.paid', limit: '1'
       }, key);
@@ -370,15 +370,35 @@ export default async function handler(req, res) {
           !/^[0-9]{1,24}$/.test(order.payment_reference || '')) {
         return res.status(403).json({ ok: false, error: 'Compra no acreditada.' });
       }
-      // No alcanza con status=paid: la entrega necesita además una validación
-      // independiente y persistente del pago, todavía pendiente de habilitar.
-      return res.status(403).json({
-        ok: false, downloadsEnabled: false,
-        error: 'Enlaces del administrador preparados; entrega pendiente de validación final del pago.'
+      const response = await fetch('https://api.mercadopago.com/v1/payments/' + order.payment_reference, {
+        headers: { Authorization: 'Bearer ' + mpToken, Accept: 'application/json' },
+        signal: AbortSignal.timeout(15000)
       });
+      if (!response.ok) throw new Error('Mercado Pago HTTP ' + response.status);
+      const payment = await response.json();
+      // Nunca habilitar esta ruta de TEST para un pago reportado como real.
+      const valid = payment?.status === 'approved' && payment?.live_mode === false &&
+        String(payment?.id ?? '') === order.payment_reference &&
+        payment?.external_reference === order.id && payment?.currency_id === order.currency &&
+        order.currency === 'ARS' && Number.isSafeInteger(payment?.transaction_amount) &&
+        payment.transaction_amount === order.total_ars;
+      if (!valid) return res.status(403).json({
+        ok: false, downloadsEnabled: false, error: 'El pago todavía no supera la verificación de entrega.'
+      });
+      const links = await rows(base, 'product_downloads', {
+        select: 'id,type,url,group_name,label,position',
+        product_id: 'eq.' + productId, status: 'eq.active', order: 'position.asc', limit: '100'
+      }, key);
+      // No permitir esquemas javascript:, data:, file: u otros destinos inseguros.
+      const safeLinks = links.filter(link => {
+        try { const u = new URL(link.url); return u.protocol === 'https:' || u.protocol === 'magnet:'; }
+        catch (_) { return false; }
+      });
+      return res.status(200).json({ ok: true, downloadsEnabled: true,
+        product_id: productId, links: safeLinks });
     } catch (error) {
       console.error('AREA51 enlaces-comprados:', error.message);
-      return res.status(502).json({ ok: false, error: 'No se pudo validar el acceso.' });
+      return res.status(502).json({ ok: false, error: 'No se pudo validar la entrega.' });
     }
   }
 
