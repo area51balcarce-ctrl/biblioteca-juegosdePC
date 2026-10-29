@@ -466,10 +466,15 @@ export default async function handler(req, res) {
       });
       if (!sellerResponse.ok) throw new Error('Identidad de vendedor HTTP ' + sellerResponse.status);
       const seller = await sellerResponse.json();
-      const sellerMatches = Boolean(seller?.id && payment?.collector_id &&
-        String(seller.id) === String(payment.collector_id));
-      // Nunca habilitar esta ruta de TEST para un pago reportado como real.
-      const valid = sellerMatches && payment?.status === 'approved' && payment?.live_mode === false &&
+      const sellerMatches = String(seller?.id ?? '') === '3544226015' &&
+        String(payment?.collector_id ?? '') === '3544226015' &&
+        Array.isArray(seller?.tags) && seller.tags.some(t => typeof t === 'string' && /test/i.test(t));
+      // Checkout Pro puede reportar live_mode=true con vendedor TESTUSER.
+      // Validar siempre identidad test y metadata de la preferencia original.
+      const meta = payment?.metadata || {};
+      const valid = sellerMatches && payment?.status === 'approved' &&
+        payment?.status_detail === 'accredited' &&
+        meta.area51_test === true && String(meta.order_id ?? '') === order.id &&
         String(payment?.id ?? '') === order.payment_reference &&
         payment?.external_reference === order.id && payment?.currency_id === order.currency &&
         order.currency === 'ARS' && Number.isSafeInteger(payment?.transaction_amount) &&
