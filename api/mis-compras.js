@@ -75,6 +75,8 @@ export default async function handler(req, res) {
       sellerIdentity = {
         checked: Boolean(sellerId && collectorId),
         matches_payment: Boolean(sellerId && collectorId && sellerId === collectorId),
+        matches_registered_test_seller: sellerId === '3544226015',
+        payment_matches_registered_test_seller: collectorId === '3544226015',
         account_test_tag_present: Array.isArray(seller?.tags) && seller.tags.some(tag => typeof tag === 'string' && /test/i.test(tag)),
         error: null
       };
@@ -107,7 +109,9 @@ export default async function handler(req, res) {
     // SOLO diagnóstico: NO cambia la condición verified ni concede productos.
     const paymentIntegrity = checks.approved && checks.payment_id &&
       checks.order_reference && checks.currency && checks.amount &&
-      checks.order_payment_reference && sellerIdentity.matches_payment;
+      checks.order_payment_reference && sellerIdentity.matches_payment &&
+      sellerIdentity.matches_registered_test_seller &&
+      sellerIdentity.payment_matches_registered_test_seller;
     const environmentClassification = payment?.live_mode === false
       ? 'reported_test'
       : payment?.live_mode === true
