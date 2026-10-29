@@ -370,6 +370,15 @@ export default async function handler(req, res) {
           !/^[0-9]{1,24}$/.test(order.payment_reference || '')) {
         return res.status(403).json({ ok: false, error: 'Compra no acreditada.' });
       }
+      // El producto solicitado también debe figurar en los ítems de ESE pedido.
+      // Un acceso aislado nunca debe permitir descargar otro juego.
+      const purchasedItems = await rows(base, 'order_items', {
+        select: 'product_id', order_id: 'eq.' + order.id,
+        product_id: 'eq.' + productId, limit: '1'
+      }, key);
+      if (purchasedItems.length !== 1) {
+        return res.status(403).json({ ok: false, error: 'Producto no incluido en el pedido acreditado.' });
+      }
       const response = await fetch('https://api.mercadopago.com/v1/payments/' + order.payment_reference, {
         headers: { Authorization: 'Bearer ' + mpToken, Accept: 'application/json' },
         signal: AbortSignal.timeout(15000)
