@@ -94,8 +94,14 @@ export default async function handler(req, res) {
       payment_environment: {
         live_mode_type: typeof payment?.live_mode,
         live_mode_value: typeof payment?.live_mode === 'boolean' ? payment.live_mode : null,
-        live_mode_present: Object.prototype.hasOwnProperty.call(payment || {}, 'live_mode')
+         live_mode_present: Object.prototype.hasOwnProperty.call(payment || {}, 'live_mode'),
+        payment_method: typeof payment?.payment_method_id === 'string' ? payment.payment_method_id : null,
+        payment_type: typeof payment?.payment_type_id === 'string' ? payment.payment_type_id : null,
+        status_detail: typeof payment?.status_detail === 'string' ? payment.status_detail : null,
+        processing_mode: typeof payment?.processing_mode === 'string' ? payment.processing_mode : null,
+        payment_created_at: typeof payment?.date_created === 'string' ? payment.date_created : null
       },
+
       order_status: order.status, order_id: order.id,
       writesPerformed: false, downloadsEnabled: false,
       message: verified
