@@ -17,6 +17,12 @@
 <form id="verifyForm" hidden><label for="code">Código de seis dígitos</label><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="000000"><button type="submit">🔓 Ingresar a MIS COMPRAS</button></form>
 </section>
 <section id="logged" hidden><p>🛸 Sesión de prueba iniciada para:</p><strong id="account"></strong><p id="expiry" class="note"></p><p class="note">Biblioteca de prueba: solo se muestran productos con compras pagadas registradas. Las descargas siguen deshabilitadas.</p><section id="library" class="library"><h2>🎮 Mis juegos y programas</h2><p id="libraryStatus" class="note" role="status">Consultando compras...</p><div id="libraryList" class="library-list"></div></section><button id="logout" type="button">Cerrar sesión</button></section>
+<section id="testPayment" class="library" hidden>
+<h2>🧪 Acreditación de compra de prueba</h2>
+<p class="note">Verifica con Mercado Pago el pago de Barbie: Horse Trails ($10.000) y acredita el pedido únicamente si todas las comprobaciones son correctas.</p>
+<button id="confirmTestPayment" type="button">🔎 Verificar y acreditar compra de prueba</button>
+<p id="testPaymentStatus" class="notice" role="status" aria-live="polite"></p>
+</section>
 <a href="/">← Volver al catálogo</a>
 </main>
 <script src="/assets/config.js"></script>
@@ -25,7 +31,7 @@
 const $=id=>document.getElementById(id), status=$('status');
 function message(text,error=false){status.textContent=text;status.className='notice '+(error?'error':'success');}
 let libraryRequest=0;
-function view(session){$('login').hidden=!!session;$('logged').hidden=!session;if(session){$('account').textContent=session.email;$('expiry').textContent='La sesión vence: '+new Date(session.expiresAt).toLocaleString('es-AR');message('Acceso de prueba verificado correctamente.');loadLibrary();}else{libraryRequest++;$('libraryList').replaceChildren();message('Ingresá tu correo para recibir un código de acceso.');}}
+function view(session){$('login').hidden=!!session;$('logged').hidden=!session;if(session){$('testPayment').hidden=session.email!=='area51.balcarce@gmail.com';$('account').textContent=session.email;$('expiry').textContent='La sesión vence: '+new Date(session.expiresAt).toLocaleString('es-AR');message('Acceso de prueba verificado correctamente.');loadLibrary();}else{$('testPayment').hidden=true;libraryRequest++;$('libraryList').replaceChildren();message('Ingresá tu correo para recibir un código de acceso.');}}
 async function api(path,options){const response=await fetch(path,{credentials:'same-origin',cache:'no-store',...options});let data;try{data=await response.json();}catch{throw new Error('El servidor no devolvió una respuesta válida.');}if(!response.ok)throw new Error(data.error||'No se pudo completar la operación.');return data;}
 async function refresh(){try{const session=await api('/api/mis-compras?action=session');view(session);}catch(e){if(e.message==='El servidor no devolvió una respuesta válida.')message(e.message,true);view(null);}}
 async function loadLibrary(){
@@ -37,7 +43,7 @@ async function loadLibrary(){
   if(request!==libraryRequest)return;
   if(!Array.isArray(data.products))throw new Error('Respuesta inesperada.');
   if(!data.products.length){note.textContent='Todavía no tenés compras pagadas registradas en esta biblioteca.';return;}
-  note.textContent=data.products.length+' producto(s) adquirido(s). Descargas deshabilitadas durante las pruebas.';
+  note.textContent=data.products.length+' producto(s) adquirido(s). Abrí los enlaces autorizados de cada compra.';
   for(const p of data.products){
    const item=document.createElement('article');item.className='library-item';
    // Solo se utiliza la portada PUBLICA del bucket covers; nunca archivos privados.
@@ -57,6 +63,23 @@ async function loadLibrary(){
     if(!Number.isNaN(d.getTime())){const date=document.createElement('small');date.className='library-date';date.textContent='📅 Acceso registrado: '+d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});info.append(date);}
    }
    if(typeof p.slug==='string'&&p.slug){const a=document.createElement('a');a.href='/producto/?slug='+encodeURIComponent(p.slug);a.textContent='Ver ficha pública';info.append(a);}
+   const linkButton=document.createElement('button');
+   linkButton.type='button';linkButton.textContent='🔗 Ver enlaces de descarga';
+   const linksArea=document.createElement('div');linksArea.className='note';linksArea.hidden=true;
+   linkButton.addEventListener('click',async()=>{
+    linkButton.disabled=true;linksArea.hidden=false;linksArea.textContent='Verificando compra y enlaces...';
+    try{
+     const delivery=await api('/api/mis-compras?action=enlaces-comprados&product_id='+encodeURIComponent(p.id));
+     linksArea.replaceChildren();
+     if(!Array.isArray(delivery.links)||!delivery.links.length){linksArea.textContent='No hay enlaces activos configurados para este producto.';return;}
+     for(const link of delivery.links){
+      if(typeof link.url!=='string')continue;
+      const a=document.createElement('a');a.href=link.url;a.target='_blank';a.rel='noopener noreferrer';
+      a.textContent='🔗 '+(link.label||link.type||'Descarga');linksArea.append(a);
+     }
+    }catch(error){linksArea.textContent=error.message;}finally{linkButton.disabled=false;}
+   });
+   info.append(linkButton,linksArea);
    item.append(info);list.append(item);
   }
  }catch(error){if(request===libraryRequest)note.textContent='No pudimos consultar tus compras: '+error.message;}
@@ -64,6 +87,19 @@ async function loadLibrary(){
 function busy(form,value){for(const button of form.querySelectorAll('button'))button.disabled=value;}
 $('requestForm').addEventListener('submit',async e=>{e.preventDefault();const form=e.currentTarget;busy(form,true);message('Enviando código...');try{await api('/api/request-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value.trim()})});$('verifyForm').hidden=false;message('Código enviado. Revisá tu correo (también spam).');$('code').focus();}catch(error){message(error.message,true);}finally{busy(form,false);}});
 $('verifyForm').addEventListener('submit',async e=>{e.preventDefault();const form=e.currentTarget;busy(form,true);message('Verificando código...');try{await api('/api/verify-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value.trim(),code:$('code').value.trim()})});$('code').value='';await refresh();}catch(error){message(error.message,true);}finally{busy(form,false);}});
+$('confirmTestPayment').addEventListener('click',async()=>{
+ const btn=$('confirmTestPayment'),note=$('testPaymentStatus');
+ btn.disabled=true;note.textContent='Verificando acreditación con Mercado Pago...';
+ try{
+  const result=await api('/api/mis-compras?action=confirmar-pago',{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({order_id:'bba221ac-370e-4906-a93f-456352d263e1',payment_id:'186617430982'})
+  });
+  note.textContent=result.ok?'✅ Compra acreditada. Consultá los enlaces en tu biblioteca.':'La compra no pudo acreditarse.';
+  if(result.ok)await loadLibrary();
+ }catch(error){note.textContent='No se acreditó el pedido: '+error.message;}
+ finally{btn.disabled=false;}
+});
 $('logout').addEventListener('click',async()=>{const btn=$('logout');btn.disabled=true;try{await api('/api/mis-compras?action=logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});$('verifyForm').hidden=true;view(null);}catch(error){message(error.message,true);}finally{btn.disabled=false;}});
 refresh();
 })();
