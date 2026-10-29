@@ -75,6 +75,7 @@ export default async function handler(req, res) {
       sellerIdentity = {
         checked: Boolean(sellerId && collectorId),
         matches_payment: Boolean(sellerId && collectorId && sellerId === collectorId),
+        account_test_tag_present: Array.isArray(seller?.tags) && seller.tags.some(tag => typeof tag === 'string' && /test/i.test(tag)),
         error: null
       };
     } catch (_) {
