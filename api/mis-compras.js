@@ -102,10 +102,23 @@ export default async function handler(req, res) {
       checks.order_reference && checks.currency && checks.amount &&
       checks.order_payment_reference && checks.sandbox;
 
+    // ETAPA 6 — Separar integridad del pago de la clasificación del entorno.
+    // SOLO diagnóstico: NO cambia la condición verified ni concede productos.
+    const paymentIntegrity = checks.approved && checks.payment_id &&
+      checks.order_reference && checks.currency && checks.amount &&
+      checks.order_payment_reference && sellerIdentity.matches_payment;
+    const environmentClassification = payment?.live_mode === false
+      ? 'reported_test'
+      : payment?.live_mode === true
+        ? 'reported_live_requires_review'
+        : 'unknown_requires_review';
+
     return res.status(200).json({
       ok: true, testMode: true, verified, checks,
       payment_status: typeof payment.status === 'string' ? payment.status : 'unknown',
       seller_identity: sellerIdentity,
+      payment_integrity: { passed: paymentIntegrity, seller_checked: sellerIdentity.checked },
+      environment_classification: environmentClassification,
       // Solo diagnóstico de tipo y valor: sin emails, tokens ni datos personales.
       payment_environment: {
         live_mode_type: typeof payment?.live_mode,
