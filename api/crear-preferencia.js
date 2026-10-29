@@ -136,10 +136,11 @@ export default async function handler(req, res) {
       throw new Error('No se pudo crear la preferencia de prueba.');
     }
     const preference = await mpResponse.json();
-    // En esta etapa no se permite retornar el enlace de producción.
-    if (!preference?.id || typeof preference.sandbox_init_point !== 'string' ||
-        !preference.sandbox_init_point.startsWith('https://')) {
-      throw new Error('Mercado Pago no devolvió un enlace sandbox válido.');
+    // Checkout Pro usa init_point también con cuentas vendedoras de prueba.
+    // La cuenta TESTUSER se valida en la acreditación; no usar sandbox_init_point.
+    if (!preference?.id || typeof preference.init_point !== 'string' ||
+        !preference.init_point.startsWith('https://')) {
+      throw new Error('Mercado Pago no devolvió un enlace de Checkout Pro válido.');
     }
 
     return res.status(200).json({
@@ -147,7 +148,7 @@ export default async function handler(req, res) {
       testMode: true,
       order_id: orderId,
       preference_id: preference.id,
-      sandbox_url: preference.sandbox_init_point,
+      sandbox_url: preference.init_point,
       amount_ars: price,
       message: 'Preferencia de prueba creada. El pedido sigue pendiente; no se habilitan descargas.'
     });
