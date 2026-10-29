@@ -1,0 +1,23 @@
+name: AREA51 PC - seguridad de sesiones
+on:
+  push:
+    paths:
+      - 'lib/pc/**'
+      - 'tests/pc-customer-auth.test.mjs'
+      - '.github/workflows/pc-auth-tests.yml'
+  pull_request:
+    paths:
+      - 'lib/pc/**'
+      - 'tests/pc-customer-auth.test.mjs'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Comprobar sesiones y codigos
+        run: node --test tests/pc-customer-auth.test.mjs
