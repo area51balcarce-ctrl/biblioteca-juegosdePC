@@ -10,13 +10,13 @@
 <body>
 <main class="panel">
 <h1>👽 MIS COMPRAS</h1><p>Tu biblioteca digital privada de AREA 51.</p>
-<p class="note">🔐 Etapa de prueba: acceso exclusivo al correo autorizado. Sin pagos ni descargas.</p>
+<p class="note">🔐 Etapa de prueba: acceso exclusivo al correo autorizado. Los enlaces se muestran únicamente tras verificar la compra.</p>
 <p id="status" class="notice" role="status" aria-live="polite">Comprobando sesión...</p>
 <section id="login" hidden>
 <form id="requestForm"><label for="email">Correo electrónico</label><input id="email" name="email" type="email" autocomplete="email" required value="area51.balcarce@gmail.com"><button type="submit">📧 Enviar código</button></form>
 <form id="verifyForm" hidden><label for="code">Código de seis dígitos</label><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="000000"><button type="submit">🔓 Ingresar a MIS COMPRAS</button></form>
 </section>
-<section id="logged" hidden><p>🛸 Sesión de prueba iniciada para:</p><strong id="account"></strong><p id="expiry" class="note"></p><p class="note">Biblioteca de prueba: solo se muestran productos con compras pagadas registradas. Las descargas siguen deshabilitadas.</p><section id="library" class="library"><h2>🎮 Mis juegos y programas</h2><p id="libraryStatus" class="note" role="status">Consultando compras...</p><div id="libraryList" class="library-list"></div></section><button id="logout" type="button">Cerrar sesión</button></section>
+<section id="logged" hidden><p>🛸 Sesión de prueba iniciada para:</p><strong id="account"></strong><p id="expiry" class="note"></p><p class="note">Biblioteca de prueba: los enlaces del administrador se habilitan únicamente para compras acreditadas y verificadas.</p><section id="library" class="library"><h2>🎮 Mis juegos y programas</h2><p id="libraryStatus" class="note" role="status">Consultando compras...</p><div id="libraryList" class="library-list"></div></section><button id="logout" type="button">Cerrar sesión</button></section>
 <section id="testPayment" class="library" hidden>
 <h2>🧪 Acreditación de compra de prueba</h2>
 <p class="note">Verifica con Mercado Pago el pago de Barbie: Horse Trails ($10.000) y acredita el pedido únicamente si todas las comprobaciones son correctas.</p>
