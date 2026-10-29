@@ -113,12 +113,26 @@ export default async function handler(req, res) {
         ? 'reported_live_requires_review'
         : 'unknown_requires_review';
 
+    // ETAPA 7: evidencia del Checkout Pro de prueba, solo lectura.
+    // metadata.area51_test se define al crear la preferencia; es una señal
+    // informativa, NO una prueba suficiente para acreditar ni dar descargas.
+    const paymentMetadata = payment?.metadata && typeof payment.metadata === 'object'
+      ? payment.metadata : {};
+    const checkoutTestEvidence = {
+      marker_present: paymentMetadata.area51_test === true,
+      marker_order_matches: String(paymentMetadata.order_id ?? '') === order.id,
+      payment_reports_live: payment?.live_mode === true,
+      integrity_passed: paymentIntegrity,
+      requires_manual_environment_review: payment?.live_mode !== false
+    };
+
     return res.status(200).json({
       ok: true, testMode: true, verified, checks,
       payment_status: typeof payment.status === 'string' ? payment.status : 'unknown',
       seller_identity: sellerIdentity,
       payment_integrity: { passed: paymentIntegrity, seller_checked: sellerIdentity.checked },
       environment_classification: environmentClassification,
+      checkout_test_evidence: checkoutTestEvidence,
       // Solo diagnóstico de tipo y valor: sin emails, tokens ni datos personales.
       payment_environment: {
         live_mode_type: typeof payment?.live_mode,
