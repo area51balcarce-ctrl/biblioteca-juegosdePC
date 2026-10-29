@@ -53,6 +53,17 @@ begin
     raise exception 'Productos e importe del pedido no coinciden';
   end if;
 
+  -- No confirmar una compra que dejaría un acceso previamente revocado
+  -- sin restaurar. Esa situación requiere una política de restitución explícita.
+  if exists (
+    select 1 from public.order_items i
+    join public.customer_entitlements e
+      on e.product_id = i.product_id and e.customer_email = v_order.customer_email
+    where i.order_id = p_order_id and e.revoked_at is not null
+  ) then
+    raise exception 'Acceso revocado: requiere revisión antes de acreditar';
+  end if;
+
   -- Si ya existe acceso al mismo producto por otra compra, no lo reemplazamos.
   -- El pedido igualmente queda registrado; la unicidad evita accesos duplicados.
   insert into public.customer_entitlements(customer_email,product_id,order_id)
