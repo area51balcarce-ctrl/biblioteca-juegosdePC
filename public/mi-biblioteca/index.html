@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Mis juegos | AREA 51 PC</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#070a19;color:#f4f5ff}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0%,#222253 0%,#0c1028 48%,#070a19 100%)}
+header,main{width:min(1100px,calc(100% - 32px));margin:auto}header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:28px 0;border-bottom:1px solid #55517c}a{color:#a5f1e5;text-decoration:none}h1{margin:28px 0 8px;font-size:clamp(1.6rem,4vw,2.5rem)}p{color:#c2c8e5;line-height:1.6}.pill{display:inline-block;border:1px solid #655b98;border-radius:100px;padding:7px 12px;color:#c7c0ff;font-size:.83rem}.card{background:#141b39;border:1px solid #565080;border-radius:16px;padding:22px;margin:22px 0}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px;margin:24px 0 48px}.game{background:#151c3a;border:1px solid #4e527f;border-radius:16px;overflow:hidden}.art{height:145px;display:grid;place-items:center;font-size:54px;background:linear-gradient(145deg,#332b68,#0d4560)}.detail{padding:18px}.detail h2{font-size:1.12rem;margin:0 0 8px;overflow-wrap:anywhere}.detail p{margin:0;font-size:.85rem}.state{padding:10px 12px;border-radius:9px;background:#222a47;color:#d3d9f4;font-size:.8rem;margin-top:15px}button{background:#a5e9de;color:#0b2030;border:0;border-radius:10px;padding:12px 16px;font-weight:700;cursor:pointer}button:disabled{opacity:.6;cursor:wait}#message{min-height:28px}footer{padding:25px 0;color:#9fa8c9;font-size:.8rem;border-top:1px solid #55517c}[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header><strong>👽 AREA 51 · PC</strong><a href="/">Volver al catálogo</a></header>
+<main>
+<h1>🛸 Mi biblioteca privada</h1>
+<p>Juegos registrados para tu cuenta. Acceso exclusivo de prueba.</p>
+<div class="pill">🔒 Modo de prueba · Sin compras ni descargas</div>
+<section class="card" id="account" hidden><strong>Cuenta autenticada:</strong> <span id="email"></span><div style="margin-top:16px"><button type="button" id="logout">Cerrar sesión</button></div></section>
+<section class="card" id="unauthorized" hidden><h2>Iniciá sesión para ver tus juegos</h2><p>El acceso se realiza mediante el correo autorizado de AREA 51.</p><a href="/test-acceso/">🔑 Ir al acceso privado</a></section>
+<p id="message" role="status" aria-live="polite">Consultando tu biblioteca...</p>
+<section class="grid" id="games" aria-label="Juegos de mi biblioteca"></section>
+<footer>AREA 51 Balcarce · Biblioteca PC. Esta página no entrega enlaces de descarga.</footer>
+</main>
+<script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id);
+async function api(action,options={}){
+ const response=await fetch('/api/mis-compras?action='+encodeURIComponent(action),{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'},...options});
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok){const error=new Error(data.error||'No se pudo consultar el servidor.');error.status=response.status;throw error;}
+ return data;
+}
+function showUnauthorized(message){$('account').hidden=true;$('unauthorized').hidden=false;$('games').replaceChildren();$('message').textContent=message||'Ingresá para consultar tu biblioteca.';}
+async function load(){
+ try{
+  const data=await api('customer-library');
+  if(!Array.isArray(data.products)||data.downloadsEnabled!==false||data.testMode!==true)throw new Error('Respuesta inesperada del servidor.');
+  $('email').textContent=data.email||'';$('account').hidden=false;$('unauthorized').hidden=true;
+  const games=$('games');games.replaceChildren();
+  if(!data.products.length){$('message').textContent='Todavía no hay juegos registrados en tu biblioteca.';return;}
+  $('message').textContent=data.products.length+' juego(s) en tu biblioteca de prueba.';
+  for(const product of data.products){
+   const article=document.createElement('article');article.className='game';
+   const art=document.createElement('div');art.className='art';art.textContent='🎮';art.setAttribute('aria-hidden','true');
+   const detail=document.createElement('div');detail.className='detail';
+   const title=document.createElement('h2');title.textContent=typeof product.name==='string'?product.name:'Juego';detail.append(title);
+   if(typeof product.granted_at==='string'){
+    const date=new Date(product.granted_at);
+    if(!Number.isNaN(date.getTime())){const p=document.createElement('p');p.textContent='Registrado: '+date.toLocaleDateString('es-AR');detail.append(p);}
+   }
+   const state=document.createElement('div');state.className='state';state.textContent='🔒 Descargas deshabilitadas durante la prueba';detail.append(state);
+   article.append(art,detail);games.append(article);
+  }
+ }catch(error){if(error.status===401||error.status===403)showUnauthorized('No hay una sesión activa para esta biblioteca.');else $('message').textContent='No se pudo cargar la biblioteca. '+error.message;}
+}
+$('logout').addEventListener('click',async()=>{
+ const button=$('logout');button.disabled=true;
+ try{await api('customer-logout',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:'{}'});showUnauthorized('Sesión cerrada correctamente.');}
+ catch(error){$('message').textContent='No se pudo cerrar sesión: '+error.message;}
+ finally{button.disabled=false;}
+});
+load();
+})();
+</script>
+</body>
+</html>
