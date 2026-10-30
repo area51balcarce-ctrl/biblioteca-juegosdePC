@@ -3,6 +3,7 @@
 import customerLibraryHandler from '../lib/pc/customer-library-handler.js';
 import { readSession, clearSessionCookie, sameOrigin } from './_lib/a51-session.js';
 import customerAuthHandler from '../lib/pc/customer-auth-handler.js';
+import { readCustomerSession } from '../lib/pc/a51-customer-session-store.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function headers(key) { return { apikey: key, Authorization: `Bearer ${key}`, Accept: 'application/json' }; }
@@ -496,10 +497,16 @@ export default async function handler(req, res) {
 
   // AREA 51 — entrega segura de enlaces configurados en el ADMIN.
   // El servidor consulta Mercado Pago en CADA solicitud; no confía solo en Supabase.
-  if (action === 'enlaces-comprados') {
+  if (action === 'enlaces-comprados' || action === 'customer-test-links') {
     res.setHeader('Allow', 'GET');
     if (req.method !== 'GET') return res.status(405).json({ ok: false, error: 'Método no permitido.' });
-    const session = readSession(req);
+    // Nueva sesion OTP solo en ruta aislada; la ruta anterior queda intacta.
+    // Se mantiene restringido al correo autorizado y vendedor TEST de Mercado Pago.
+    const session = action === 'customer-test-links'
+      ? (process.env.AREA51_CUSTOMER_AUTH_ENABLED === 'true' ? await readCustomerSession(req) : null)
+      : readSession(req);
+    if (action === 'customer-test-links' && session?.email !== 'area51.balcarce@gmail.com')
+      return res.status(401).json({ ok: false, error: 'Acceso de prueba no autorizado.' });
     if (!session) return res.status(401).json({ ok: false, error: 'Sesión no válida.' });
     const productId = typeof req.query?.product_id === 'string' ? req.query.product_id : '';
     if (!UUID.test(productId)) return res.status(400).json({ ok: false, error: 'Producto inválido.' });
