@@ -48,9 +48,9 @@ async function load(){
    const fallback=document.createElement('span');fallback.textContent='🎮';fallback.setAttribute('aria-hidden','true');
    art.append(fallback);
    // Misma ruta publica de portadas que el catalogo. Nunca usar URLs privadas.
-   const base=typeof window.A51_SUPABASE_URL==='string'?window.A51_SUPABASE_URL.replace(/\\/$/,''):'';
+   const base=typeof window.A51_SUPABASE_URL==='string'?window.A51_SUPABASE_URL.replace(/\/$/,''):'';
    const path=product.cover_path;
-   if(base && /^https:\\/\\/[^/]+$/.test(base) && typeof path==='string' && path && !path.split('/').includes('..')){
+   if(base && /^https:\/\/[^/]+$/.test(base) && typeof path==='string' && path && !path.split('/').includes('..')){
     const image=document.createElement('img');image.alt='Portada de '+(product.name||'juego');
     image.loading='lazy';image.decoding='async';
     image.src=base+'/storage/v1/object/public/covers/'+path.split('/').map(encodeURIComponent).join('/');
