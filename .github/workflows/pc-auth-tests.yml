@@ -5,12 +5,14 @@ on:
       - 'lib/pc/**'
       - 'tests/pc-customer-auth.test.mjs'
       - 'tests/pc-auth-closed-beta.test.mjs'
+      - 'tests/pc-customer-library.test.mjs'
       - '.github/workflows/pc-auth-tests.yml'
   pull_request:
     paths:
       - 'lib/pc/**'
       - 'tests/pc-customer-auth.test.mjs'
       - 'tests/pc-auth-closed-beta.test.mjs'
+      - 'tests/pc-customer-library.test.mjs'
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -22,4 +24,4 @@ jobs:
         with:
           node-version: '22'
       - name: Comprobar sesiones y codigos
-        run: node --experimental-default-type=module --test tests/pc-customer-auth.test.mjs tests/pc-auth-closed-beta.test.mjs
+        run: node --experimental-default-type=module --test tests/pc-customer-auth.test.mjs tests/pc-auth-closed-beta.test.mjs tests/pc-customer-library.test.mjs
