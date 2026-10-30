@@ -51,3 +51,22 @@ test('OTP expires and can only be attempted five times', () => {
   assert.equal(isLoginCodeUsable({...row,consumed_at:new Date(now).toISOString()},now),false);
   assert.equal(isLoginCodeUsable({...row,expires_at:new Date(now-1).toISOString()},now),false);
 });
+
+test('regression: session remains valid after refresh with consistent timestamps', () => {
+  const now=Date.now();
+  const created=new Date(now-15000).toISOString();
+  const row={created_at:created,last_seen_at:created,
+    expires_at:new Date(now+180*86400000-15000).toISOString(),revoked_at:null};
+  assert.equal(isValidSession(row,now),true);
+  assert.equal(isValidSession({...row,revoked_at:new Date(now).toISOString()},now),false);
+  assert.equal(isValidSession({...row,last_seen_at:new Date(now+1000).toISOString()},now),false);
+});
+test('regression: cookies cannot be reused after logout in validation layer', () => {
+  const now=Date.now(), token=createToken();
+  assert.equal(getCookieToken('a51_pc_customer='+token),token);
+  assert.equal(getCookieToken(''),null);
+  const session={created_at:new Date(now-1000).toISOString(),
+    last_seen_at:new Date(now-1000).toISOString(),
+    expires_at:new Date(now+60000).toISOString(),revoked_at:new Date(now).toISOString()};
+  assert.equal(isValidSession(session,now),false);
+});
