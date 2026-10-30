@@ -1,5 +1,6 @@
 // AREA 51 — API unificada MIS COMPRAS para Vercel Hobby.
 // Sesión, cierre y lectura de productos adquiridos. Sin pagos ni descargas.
+import customerLibraryHandler from '../lib/pc/customer-library-handler.js';
 import { readSession, clearSessionCookie, sameOrigin } from './_lib/a51-session.js';
 import customerAuthHandler from '../lib/pc/customer-auth-handler.js';
 
@@ -18,6 +19,12 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   const action = typeof req.query?.action === 'string' ? req.query.action : '';
+
+  // AREA 51 — Biblioteca privada con nueva sesión.
+  if (action === 'customer-library') {
+    return customerLibraryHandler(req, res);
+  }
+
 
   // AREA51: production customer access, gated and isolated from test actions.
   // Vercel Hobby reuses this existing function; no extra function deployed.
