@@ -12,6 +12,7 @@
 <h1>👽 MIS COMPRAS</h1><p>Tu biblioteca digital privada de AREA 51.</p>
 <p class="note">🔐 Etapa de prueba: acceso exclusivo al correo autorizado. Los enlaces se muestran únicamente tras verificar la compra.</p>
 <p id="status" class="notice" role="status" aria-live="polite">Comprobando sesión...</p>
+<section id="customerSession" hidden><p>✅ Tu sesión de cliente está activa.</p><strong id="customerEmail"></strong><p>Encontrá tus compras acreditadas, juegos y descargas en tu biblioteca privada.</p><a href="/mi-biblioteca/">🛸 Abrir Mi Biblioteca</a></section>
 <section id="login" hidden>
 <form id="requestForm"><label for="email">Correo electrónico</label><input id="email" name="email" type="email" autocomplete="email" required value="area51.balcarce@gmail.com"><button type="submit">📧 Enviar código</button></form>
 <form id="verifyForm" hidden><label for="code">Código de seis dígitos</label><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="000000"><button type="submit">🔓 Ingresar a MIS COMPRAS</button></form>
@@ -33,7 +34,22 @@ function message(text,error=false){status.textContent=text;status.className='not
 let libraryRequest=0;
 function view(session){$('login').hidden=!!session;$('logged').hidden=!session;if(session){$('testPayment').hidden=session.email!=='area51.balcarce@gmail.com';$('account').textContent=session.email;$('expiry').textContent='La sesión vence: '+new Date(session.expiresAt).toLocaleString('es-AR');message('Acceso de prueba verificado correctamente.');loadLibrary();}else{$('testPayment').hidden=true;libraryRequest++;$('libraryList').replaceChildren();message('Ingresá tu correo para recibir un código de acceso.');}}
 async function api(path,options){const response=await fetch(path,{credentials:'same-origin',cache:'no-store',...options});let data;try{data=await response.json();}catch{throw new Error('El servidor no devolvió una respuesta válida.');}if(!response.ok)throw new Error(data.error||'No se pudo completar la operación.');return data;}
-async function refresh(){try{const session=await api('/api/mis-compras?action=session');view(session);}catch(e){if(e.message==='El servidor no devolvió una respuesta válida.')message(e.message,true);view(null);}}
+async function refresh(){
+ // Primero reconocer la sesión pública existente, sin cambiar la sesión TEST heredada.
+ try{
+  const customer=await api('/api/mis-compras?action=customer-library');
+  if(customer?.ok===true&&typeof customer.email==='string'&&customer.email){
+   $('login').hidden=true;$('logged').hidden=true;$('testPayment').hidden=true;
+   $('customerSession').hidden=false;
+   $('customerEmail').textContent=customer.email;
+   message('Sesión verificada. No necesitás solicitar otro código.');
+   return;
+  }
+ }catch(error){/* Sin sesión pública: conservar el flujo anterior de prueba. */}
+ $('customerSession').hidden=true;
+ try{const session=await api('/api/mis-compras?action=session');view(session);}
+ catch(e){if(e.message==='El servidor no devolvió una respuesta válida.')message(e.message,true);view(null);}
+}
 async function loadLibrary(){
  const request=++libraryRequest;
  const list=$('libraryList'), note=$('libraryStatus');
