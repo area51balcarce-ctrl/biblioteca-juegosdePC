@@ -110,7 +110,7 @@ async function load(){
          if(result.ok!==true||result.downloadsEnabled!==true)throw new Error('Entrega no habilitada');
          let count=0;
          for(const link of result.links||[]){
-           if(typeof link.url!=='string'||!(/^(https:\\/\\/|magnet:\\?)/i).test(link.url))continue;
+           if(typeof link.url!=='string'||!(link.url.startsWith('https://')||link.url.startsWith('magnet:?')))continue;
            const item=document.createElement('a');
            item.href=link.url;item.textContent='🔗 '+(link.label||link.group_name||'Enlace de descarga');
            item.target='_blank';item.rel='noopener noreferrer';
