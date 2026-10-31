@@ -15,8 +15,8 @@ header,main{width:min(1100px,calc(100% - 32px));margin:auto}header{display:flex;
 <header><strong>👽 AREA 51 · PC</strong><a href="/">Volver al catálogo</a></header>
 <main>
 <h1>🛸 Mi biblioteca privada</h1>
-<p>Juegos registrados para tu cuenta. Acceso exclusivo de prueba.</p>
-<div class="pill">🔒 Modo de prueba · Sin compras ni descargas</div>
+<p>Tus juegos y sus opciones de descarga, disponibles en tu cuenta.</p>
+<div class="pill">🔐 Acceso privado a tus juegos</div>
 <section class="card" id="account" hidden><strong>Cuenta autenticada:</strong> <span id="email"></span><div style="margin-top:16px"><button type="button" id="logout">Cerrar sesión</button></div></section>
 <section class="card" id="unauthorized" hidden><h2>Iniciá sesión para ver tus juegos</h2><p>El acceso se realiza mediante el correo autorizado de AREA 51.</p><a href="/test-acceso/">🔑 Ir al acceso privado</a> <a href="/acceso/" style="margin-left:12px">👽 Acceso de clientes</a></section>
 <p id="message" role="status" aria-live="polite">Consultando tu biblioteca...</p>
@@ -42,7 +42,7 @@ async function load(){
   $('email').textContent=data.email||'';$('account').hidden=false;$('unauthorized').hidden=true;
   const games=$('games');games.replaceChildren();
   if(!data.products.length){$('message').textContent='Todavía no hay juegos registrados en tu biblioteca.';return;}
-  $('message').textContent=data.products.length+' juego(s) en tu biblioteca de prueba.';
+  $('message').textContent=data.products.length+' juego(s) en tu biblioteca.';
   for(const product of data.products){
    const article=document.createElement('article');article.className='game';
    const art=document.createElement('div');art.className='art';
@@ -65,9 +65,9 @@ async function load(){
     if(!Number.isNaN(date.getTime())){const p=document.createElement('p');p.textContent='Registrado: '+date.toLocaleDateString('es-AR');detail.append(p);}
    }
    const state=document.createElement('div');state.className='state';
-   state.textContent='🔒 Consultá las opciones de entrega verificadas';detail.append(state);
+   state.textContent='🔐 Elegí el botón para consultar tus enlaces.';detail.append(state);
    const check=document.createElement('button');check.type='button';check.textContent='📦 Ver entrega de prueba';
-   check.style.marginTop='12px';detail.append(check);
+   check.style.marginTop='12px';check.hidden=true;detail.append(check);
    const delivery=document.createElement('div');delivery.style.marginTop='10px';detail.append(delivery);
    check.addEventListener('click',async()=>{
     check.disabled=true;state.textContent='Verificando compra con Mercado Pago...';delivery.replaceChildren();
@@ -97,9 +97,9 @@ async function load(){
    if(data.liveDeliveryEnabled===true){
      const realButton=document.createElement('button');
      realButton.type='button';
-     realButton.textContent='🛸 Ver entrega de compra real';
+     realButton.textContent='🛸 Ver enlaces o magnet';
      realButton.style.marginTop='12px';
-     realButton.style.marginLeft='8px';
+     realButton.style.marginLeft='0';
      detail.append(realButton);
      realButton.addEventListener('click',async()=>{
        realButton.disabled=true;
