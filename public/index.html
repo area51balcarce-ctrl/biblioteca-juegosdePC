@@ -35,7 +35,7 @@ a{color:inherit;text-decoration:none}button,input,select{font:inherit}button{cur
 <div class="a51-step"><strong>03 · 💳 Pagá</strong><p>Completá el pago de forma segura mediante Mercado Pago.</p></div>
 <div class="a51-step"><strong>04 · 🛸 Accedé</strong><p>Cuando se acredite tu compra, ingresá con tu correo a <a href="/mi-biblioteca/" style="color:#67edbb;text-decoration:underline">Mi Biblioteca</a> para consultar tus juegos.</p></div>
 </div></section>
-<section class="shop-wrap" aria-label="Catálogo"><div class="shop-controls"><label class="shop-sr-only" for="search">Buscar productos</label><input id="search" type="search" placeholder="Buscar juegos o programas..." autocomplete="off"><label class="shop-sr-only" for="category">Filtrar categoría</label><select id="category"><option value="">Todas las categorías</option></select><label class="shop-sr-only" for="sort">Ordenar productos</label><select id="sort"><option value="name">Nombre A–Z</option><option value="price_asc">Menor precio</option><option value="price_desc">Mayor precio</option></select></div><div class="a51-advanced"><label><input type="checkbox" id="a51OnlyFavorites"> ❤️ Solo favoritos</label><label><input type="checkbox" id="a51OnlyAvailable"> 💳 Con precio</label><label>Precio desde ($) <input id="a51PriceMin" type="number" min="0" step="1" placeholder="Mínimo"></label><label>Hasta ($) <input id="a51PriceMax" type="number" min="0" step="1" placeholder="Máximo"></label></div><p class="a51-local-note">❤️ Los favoritos y el carrito se guardan en este navegador. Si cambiás de dispositivo, no se sincronizan automáticamente. Los precios se verifican al pagar.</p><p id="status" class="shop-info" role="status">Cargando catálogo...</p><div id="grid" class="shop-grid"></div><div id="empty" class="shop-empty" hidden>No se encontraron productos con esos filtros.</div></section>
+<section class="shop-wrap" aria-label="Catálogo"><div class="shop-controls"><label class="shop-sr-only" for="search">Buscar productos</label><input id="search" type="search" placeholder="Buscar juegos o programas..." autocomplete="off"><label class="shop-sr-only" for="category">Filtrar categoría</label><select id="category"><option value="">Todas las categorías</option></select><label class="shop-sr-only" for="sort">Ordenar productos</label><select id="sort"><option value="name">Nombre A–Z</option><option value="price_asc">Menor precio</option><option value="price_desc">Mayor precio</option></select></div><div class="a51-advanced"><label><input type="checkbox" id="a51OnlyFavorites"> ❤️ Solo favoritos</label><label><input type="checkbox" id="a51OnlyAvailable"> 💳 Con precio</label><label>Precio desde ($) <input id="a51PriceMin" type="number" min="0" step="1" placeholder="Mínimo"></label><label>Hasta ($) <input id="a51PriceMax" type="number" min="0" step="1" placeholder="Máximo"></label></div><p class="a51-local-note">❤️ Tus favoritos y tu carrito se sincronizan entre dispositivos al iniciar sesión con el mismo correo. Sin sesión, se guardan en este navegador. Los precios se verifican al pagar.</p><p id="status" class="shop-info" role="status">Cargando catálogo...</p><div id="grid" class="shop-grid"></div><div id="empty" class="shop-empty" hidden>No se encontraron productos con esos filtros.</div></section>
 <section class="shop-wrap a51-help" id="ayuda" aria-labelledby="a51-help-title">
 <h2 id="a51-help-title">👽 Todo lo que necesitás saber</h2>
 <p class="a51-help-lead">Antes de comprar y después de recibir tu juego, tenés estas indicaciones a mano.</p>
@@ -68,13 +68,18 @@ a{color:inherit;text-decoration:none}button,input,select{font:inherit}button{cur
 const $=id=>document.getElementById(id);
 const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
 const state={products:[],cart:new Set(),loaded:false};
+let cloudReady=false,cloudBusy=false,cloudDirty=false,cloudTimer=null;
+function queueCloudSave(){if(!cloudReady)return;cloudDirty=true;clearTimeout(cloudTimer);cloudTimer=setTimeout(flushCloud,650);}
+async function flushCloud(){if(!cloudReady||cloudBusy||!cloudDirty)return;cloudBusy=true;cloudDirty=false;const cart_ids=[...state.cart],favorite_ids=[...favorites];try{const response=await fetch('/api/mis-compras?action=customer-preferences',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({cart_ids,favorite_ids})});if(!response.ok){cloudDirty=true;console.warn('AREA51: preferencias sin sincronizar',response.status);}}catch{cloudDirty=true;}finally{cloudBusy=false;if(cloudDirty)clearTimeout(cloudTimer);}}
+async function loadCloud(){try{const response=await fetch('/api/mis-compras?action=customer-preferences',{credentials:'same-origin',cache:'no-store'});if(!response.ok)return;const data=await response.json();if(!data.ok)return;if(data.exists){state.cart=new Set(data.cart_ids||[]);favorites.clear();(data.favorite_ids||[]).forEach(id=>favorites.add(id));}cloudReady=true;saveFavorites();persist();updateCart();render();}catch(error){console.warn('AREA51: preferencias locales disponibles',error);}}
+
 const CART_KEY='a51_shop_cart_draft_v1';
 const A51_FAV_KEY='a51_shop_favorites_v1';
 const favorites=new Set();
 try{const saved=JSON.parse(localStorage.getItem(A51_FAV_KEY)||'[]');if(Array.isArray(saved))saved.filter(x=>typeof x==='string').forEach(x=>favorites.add(x));}catch{}
-function saveFavorites(){try{localStorage.setItem(A51_FAV_KEY,JSON.stringify([...favorites]));}catch{}}
+function saveFavorites(){try{localStorage.setItem(A51_FAV_KEY,JSON.stringify([...favorites]));}catch{}queueCloudSave();}
 try{const saved=JSON.parse(sessionStorage.getItem(CART_KEY)||localStorage.getItem(CART_KEY)||'[]');if(Array.isArray(saved))saved.filter(x=>typeof x==='string').forEach(x=>state.cart.add(x));}catch{}
-function persist(){const data=JSON.stringify([...state.cart]);try{sessionStorage.setItem(CART_KEY,data);}catch{}try{localStorage.setItem(CART_KEY,data);}catch{}}
+function persist(){const data=JSON.stringify([...state.cart]);try{sessionStorage.setItem(CART_KEY,data);}catch{}try{localStorage.setItem(CART_KEY,data);}catch{}queueCloudSave();}
 function priceOf(p){const n=p.price_ars;return Number.isSafeInteger(n)&&n>0?n:null;}
 function setText(el,text){el.textContent=text;}
 function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;}
@@ -178,7 +183,7 @@ async function load(){
   if((productRes.data||[]).length===1000)setText($('status'),'Se muestran los primeros 1000 productos.');
  }catch(error){console.error('ÁREA 51 catálogo:',error);setText($('status'),'No se pudo cargar el catálogo. Actualizá la página para reintentar.');$('empty').hidden=false;setText($('empty'),'No pudimos consultar los productos en este momento.');}
 }
-load().then(()=>{
+load().then(()=>{loadCloud();
  const params=new URLSearchParams(location.search);
  if(params.get('cart')==='1'){
   toggleCart(true);
