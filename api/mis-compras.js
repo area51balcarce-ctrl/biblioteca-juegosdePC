@@ -4,6 +4,7 @@ import customerLibraryHandler from '../lib/pc/customer-library-handler.js';
 import { readSession, clearSessionCookie, sameOrigin } from './_lib/a51-session.js';
 import customerAuthHandler from '../lib/pc/customer-auth-handler.js';
 import { readCustomerSession } from '../lib/pc/a51-customer-session-store.js';
+import testCheckoutHandler from './crear-preferencia.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function headers(key) { return { apikey: key, Authorization: `Bearer ${key}`, Accept: 'application/json' }; }
@@ -22,6 +23,25 @@ export default async function handler(req, res) {
   const action = typeof req.query?.action === 'string' ? req.query.action : '';
 
   // AREA 51 — Biblioteca privada con nueva sesión.
+  // Checkout de prueba con identidad obtenida SOLO de la sesion OTP.
+  // Reutiliza el handler existente; no modifica su ruta ni habilita cobros reales.
+  if (action === 'customer-test-checkout') {
+    res.setHeader('Allow', 'POST');
+    if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Metodo no permitido.' });
+    if (!sameOrigin(req)) return res.status(403).json({ ok: false, error: 'Origen no autorizado.' });
+    if (process.env.AREA51_CUSTOMER_AUTH_ENABLED !== 'true')
+      return res.status(403).json({ ok: false, error: 'Prueba no habilitada.' });
+    try {
+      const session = await readCustomerSession(req);
+      if (session?.email !== 'area51.balcarce@gmail.com')
+        return res.status(401).json({ ok: false, error: 'Sesion de prueba requerida.' });
+      req.body = { product_id: req.body?.product_id, email: session.email };
+      return testCheckoutHandler(req, res);
+    } catch (error) {
+      console.error('AREA51 customer-test-checkout:', error.message);
+      return res.status(502).json({ ok: false, error: 'No se pudo verificar la sesion.' });
+    }
+  }
   if (action === 'customer-library') {
     return customerLibraryHandler(req, res);
   }
