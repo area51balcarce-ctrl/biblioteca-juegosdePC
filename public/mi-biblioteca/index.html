@@ -63,7 +63,30 @@ async function load(){
     const date=new Date(product.granted_at);
     if(!Number.isNaN(date.getTime())){const p=document.createElement('p');p.textContent='Registrado: '+date.toLocaleDateString('es-AR');detail.append(p);}
    }
-   const state=document.createElement('div');state.className='state';state.textContent='🔒 Descargas deshabilitadas durante la prueba';detail.append(state);
+   const state=document.createElement('div');state.className='state';
+   state.textContent='🔒 Consultá las opciones de entrega verificadas';detail.append(state);
+   const check=document.createElement('button');check.type='button';check.textContent='📦 Ver entrega de prueba';
+   check.style.marginTop='12px';detail.append(check);
+   const delivery=document.createElement('div');delivery.style.marginTop='10px';detail.append(delivery);
+   check.addEventListener('click',async()=>{
+    check.disabled=true;state.textContent='Verificando compra con Mercado Pago...';delivery.replaceChildren();
+    try{
+     const result=await api('customer-test-links&product_id='+encodeURIComponent(product.product_id));
+     if(result.ok!==true||result.downloadsEnabled!==true)throw new Error('Entrega no habilitada');
+     let count=0;
+     for(const link of result.links||[]){
+      if(typeof link.url!=='string'||!(/^(https:\/\/|magnet:\?)/i).test(link.url))continue;
+      const a=document.createElement('a');a.href=link.url;a.textContent='🔗 '+(link.label||link.group_name||'Enlace de descarga');
+      a.target='_blank';a.rel='noopener noreferrer';a.style.display='block';a.style.marginTop='8px';delivery.append(a);count++;
+     }
+     if(result.torrent&&typeof result.torrent.url==='string'&&result.torrent.url.startsWith('https://')){
+      const a=document.createElement('a');a.href=result.torrent.url;a.textContent='🧲 Descargar torrent (enlace temporal)';
+      a.target='_blank';a.rel='noopener noreferrer';a.style.display='block';a.style.marginTop='8px';delivery.append(a);count++;
+     }
+     state.textContent=count?('✅ '+count+' opción(es) disponibles. El torrent vence en 2 minutos.'):'📦 Entrega pendiente: este juego todavía no tiene fuentes disponibles.';
+    }catch(error){state.textContent='🔒 No se pudo verificar la entrega: '+error.message;}
+    finally{check.disabled=false;}
+   });
    article.append(art,detail);games.append(article);
   }
  }catch(error){if(error.status===401||error.status===403)showUnauthorized('No hay una sesión activa para esta biblioteca.');else $('message').textContent='No se pudo cargar la biblioteca. '+error.message;}
