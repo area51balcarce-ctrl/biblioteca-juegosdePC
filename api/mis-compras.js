@@ -7,6 +7,7 @@ import { readCustomerSession } from '../lib/pc/a51-customer-session-store.js';
 import testCheckoutHandler from './crear-preferencia.js';
 import { magnetFromTorrent } from '../lib/pc/torrent-magnet.js';
 import liveCheckout from '../lib/pc/live-checkout.js';
+import livePaymentWebhook from '../lib/pc/live-payment-webhook.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function headers(key) { return { apikey: key, Authorization: `Bearer ${key}`, Accept: 'application/json' }; }
@@ -45,6 +46,8 @@ export default async function handler(req, res) {
     }
   }
   // Checkout real: sesion OTP y registro publico habilitados; cobro tiene su propio flag.
+  if (action === 'mp-live-webhook') return livePaymentWebhook(req,res);
+
   if (action === 'customer-live-checkout') {
     if (req.method !== 'POST') return res.status(405).json({ok:false,error:'Metodo no permitido.'});
     if (!sameOrigin(req)) return res.status(403).json({ok:false,error:'Origen no autorizado.'});
