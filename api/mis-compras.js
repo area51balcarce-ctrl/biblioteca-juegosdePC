@@ -6,6 +6,7 @@ import customerAuthHandler from '../lib/pc/customer-auth-handler.js';
 import { readCustomerSession } from '../lib/pc/a51-customer-session-store.js';
 import testCheckoutHandler from './crear-preferencia.js';
 import { magnetFromTorrent } from '../lib/pc/torrent-magnet.js';
+import liveCheckout from '../lib/pc/live-checkout.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function headers(key) { return { apikey: key, Authorization: `Bearer ${key}`, Accept: 'application/json' }; }
@@ -41,6 +42,21 @@ export default async function handler(req, res) {
     } catch (error) {
       console.error('AREA51 customer-test-checkout:', error.message);
       return res.status(502).json({ ok: false, error: 'No se pudo verificar la sesion.' });
+    }
+  }
+  // Checkout real: sesion OTP y registro publico habilitados; cobro tiene su propio flag.
+  if (action === 'customer-live-checkout') {
+    if (req.method !== 'POST') return res.status(405).json({ok:false,error:'Metodo no permitido.'});
+    if (!sameOrigin(req)) return res.status(403).json({ok:false,error:'Origen no autorizado.'});
+    if (process.env.AREA51_PUBLIC_CUSTOMER_REGISTRATION !== 'true')
+      return res.status(503).json({ok:false,error:'Registro de compradores no habilitado.'});
+    try {
+      const session = await readCustomerSession(req);
+      if (!session?.email) return res.status(401).json({ok:false,error:'Inicia sesion para comprar.'});
+      return liveCheckout(req,res,session.email);
+    } catch(error) {
+      console.error('AREA51 live session:',error.message);
+      return res.status(502).json({ok:false,error:'No se pudo verificar la sesion.'});
     }
   }
   if (action === 'customer-library') {
