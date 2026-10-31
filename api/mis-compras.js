@@ -598,8 +598,36 @@ export default async function handler(req, res) {
         try { const u = new URL(link.url); return u.protocol === 'https:' || u.protocol === 'magnet:'; }
         catch (_) { return false; }
       });
+      // Archivo principal opcional en bucket PRIVADO, nunca enlace publico.
+      // Solo se firma despues de verificar sesion, derecho, pedido y pago TEST.
+      const productFiles = await rows(base, 'products', {
+        select: 'id,file_main_path,file_main_name',
+        id: 'eq.' + productId, limit: '1'
+      }, key);
+      const file = productFiles[0];
+      let torrent = null;
+      if (file && typeof file.file_main_path === 'string' &&
+          typeof file.file_main_name === 'string' &&
+          file.file_main_name.toLowerCase().endsWith('.torrent') &&
+          file.file_main_path.startsWith(productId + '/') &&
+          !file.file_main_path.split('/').some(part => part === '..' || !part)) {
+        const signed = await fetch(base + '/storage/v1/object/sign/product-files/' +
+          file.file_main_path.split('/').map(encodeURIComponent).join('/'), {
+          method: 'POST',
+          headers: { ...headers(key), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ expiresIn: 120 }),
+          signal: AbortSignal.timeout(10000)
+        });
+        if (signed.ok) {
+          const data = await signed.json();
+          if (typeof data.signedURL === 'string' && data.signedURL.startsWith('/object/sign/')) {
+            torrent = { name: file.file_main_name,
+              url: base + '/storage/v1' + data.signedURL, expiresIn: 120 };
+          }
+        }
+      }
       return res.status(200).json({ ok: true, downloadsEnabled: true,
-        product_id: productId, links: safeLinks });
+        product_id: productId, links: safeLinks, torrent });
     } catch (error) {
       console.error('AREA51 enlaces-comprados:', error.message);
       return res.status(502).json({ ok: false, error: 'No se pudo validar la entrega.' });
