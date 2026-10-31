@@ -280,7 +280,7 @@
       ? `<div class="a51-price-box" aria-label="Precio digital">
            <span class="a51-price-label">Precio digital</span>
            <span class="a51-price-value">${esc(A51_PRICE_FORMAT.format(categoryPrice))}</span>
-           <span class="a51-price-note">Compra online próximamente</span>
+           <span class="a51-price-note">Compra segura mediante Mercado Pago, según disponibilidad</span>
          </div>`
       : `<div class="a51-price-box" aria-label="Precio sin asignar">
            <span class="a51-price-label">Precio digital</span>
@@ -383,6 +383,28 @@
     `;
 
     bindInteractions();
+    // Agregado aislado: mismo carrito de sesión del catálogo, sin modificar pagos.
+    if(categoryPrice!==null && g.id && PUBLIC_BRAND.isPartner===false){
+      const row=document.querySelector('.title-block .cta-row');
+      if(row){
+        const add=document.createElement('button');
+        add.type='button';add.className='btn btn-primary';add.textContent='🛒 Agregar al carrito';
+        add.addEventListener('click',()=>{
+          try{
+            const key='a51_shop_cart_draft_v1';
+            const saved=JSON.parse(sessionStorage.getItem(key)||'[]');
+            const cart=new Set(Array.isArray(saved)?saved.filter(id=>typeof id==='string'):[]);
+            cart.add(g.id);
+            sessionStorage.setItem(key,JSON.stringify([...cart]));
+            location.assign('/?cart=1');
+          }catch(error){
+            console.error('AREA51 carrito:',error);
+            alert('No se pudo guardar el carrito. Volvé al catálogo para agregar el juego.');
+          }
+        });
+        row.prepend(add);
+      }
+    }
   }
 
   document.addEventListener('keydown', event=>{
