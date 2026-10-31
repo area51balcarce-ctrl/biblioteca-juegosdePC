@@ -5,6 +5,7 @@ import { readSession, clearSessionCookie, sameOrigin } from './_lib/a51-session.
 import customerAuthHandler from '../lib/pc/customer-auth-handler.js';
 import { readCustomerSession } from '../lib/pc/a51-customer-session-store.js';
 import testCheckoutHandler from './crear-preferencia.js';
+import { magnetFromTorrent } from '../lib/pc/torrent-magnet.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function headers(key) { return { apikey: key, Authorization: `Bearer ${key}`, Accept: 'application/json' }; }
@@ -623,6 +624,17 @@ export default async function handler(req, res) {
           if (typeof data.signedURL === 'string' && data.signedURL.startsWith('/object/sign/')) {
             torrent = { name: file.file_main_name,
               url: base + '/storage/v1' + data.signedURL, expiresIn: 120 };
+            // Magnet opcional: extraer infohash del .torrent privado.
+            // La descarga tradicional sigue disponible si falla esta lectura.
+            try {
+              const raw = await fetch(torrent.url, { signal: AbortSignal.timeout(10000) });
+              const size = Number(raw.headers.get('content-length') || 0);
+              if (!raw.ok || size > 4 * 1024 * 1024) throw new Error('Torrent no legible');
+              const bytes = await raw.arrayBuffer();
+              torrent.magnet = magnetFromTorrent(bytes, file.file_main_name);
+            } catch (magnetError) {
+              console.warn('AREA51 magnet no disponible:', magnetError.message);
+            }
           }
         }
       }
