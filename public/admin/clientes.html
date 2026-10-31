@@ -29,7 +29,7 @@ body{padding:26px;max-width:1250px;margin:auto}header{display:flex;justify-conte
  async function load(){
   $('status').textContent='Cargando clientes…';
   try{const s=await a51_getSession();if(!s?.access_token)throw Error('Sesión vencida');
-   const r=await fetch('/api/admin-clientes',{headers:{Authorization:'Bearer '+s.access_token},cache:'no-store'});
+   const r=await fetch('/api/mis-compras?action=admin-clients',{headers:{Authorization:'Bearer '+s.access_token},cache:'no-store'});
    const d=await r.json();if(!r.ok||!d.ok)throw Error(d.error||'Error de consulta');clients=d.clients;render();
   }catch(e){$('status').textContent=e.message;$('status').className='error';}
  }
