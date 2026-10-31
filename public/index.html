@@ -19,6 +19,7 @@ a{color:inherit;text-decoration:none}button,input,select{font:inherit}button{cur
 /* AREA51: secciones informativas independientes; no afectan catálogo ni checkout */
 .a51-help{padding:30px 0 36px}.a51-help h2{font-size:clamp(22px,3vw,30px);margin:0 0 9px}.a51-help-lead{color:#b4c9bd;line-height:1.65;margin:0 0 20px}.a51-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.a51-step,.a51-info,.a51-faq details{background:#101918;border:1px solid #274139;border-radius:13px;padding:20px}.a51-step strong{display:block;color:#31ef9b;font-size:17px;margin-bottom:8px}.a51-step p,.a51-info p,.a51-faq p{color:#b4c9bd;line-height:1.65;margin:7px 0}.a51-info-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.a51-info h3{margin:0 0 9px;font-size:17px}.a51-info a,.a51-faq a{color:#67edbb;text-decoration:underline;text-underline-offset:3px}.a51-faq{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.a51-faq details{padding:15px 18px}.a51-faq summary{cursor:pointer;font-weight:700;line-height:1.5}.a51-faq details[open] summary{color:#31ef9b}.a51-legal-link{display:inline-block;border:1px solid #31ef9b;border-radius:8px;padding:11px 15px;color:#31ef9b;margin-top:12px;font-weight:700}
 @media(max-width:850px){.a51-steps{grid-template-columns:repeat(2,minmax(0,1fr))}.a51-info-grid{grid-template-columns:1fr}}@media(max-width:600px){.a51-steps,.a51-faq{grid-template-columns:1fr}.a51-step,.a51-info{padding:16px}.a51-help{padding:25px 0}}
+.a51-advanced{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:0 0 12px}.a51-advanced label{display:flex;align-items:center;gap:7px;font-size:13px;color:#c2d3c9}.a51-advanced input[type=number]{width:125px;background:#101918;border:1px solid #274139;border-radius:7px;color:#fff;padding:9px}.a51-favorite{border:1px solid #274139;background:#14241f;color:#eaf7f1;padding:8px 11px;border-radius:7px;font-size:12px;align-self:flex-start;margin-bottom:9px}.a51-local-note{font-size:12px;color:#8da59c;line-height:1.5}
 </style>
 </head>
 <body>
@@ -34,7 +35,7 @@ a{color:inherit;text-decoration:none}button,input,select{font:inherit}button{cur
 <div class="a51-step"><strong>03 · 💳 Pagá</strong><p>Completá el pago de forma segura mediante Mercado Pago.</p></div>
 <div class="a51-step"><strong>04 · 🛸 Accedé</strong><p>Cuando se acredite tu compra, ingresá con tu correo a <a href="/mi-biblioteca/" style="color:#67edbb;text-decoration:underline">Mi Biblioteca</a> para consultar tus juegos.</p></div>
 </div></section>
-<section class="shop-wrap" aria-label="Catálogo"><div class="shop-controls"><label class="shop-sr-only" for="search">Buscar productos</label><input id="search" type="search" placeholder="Buscar juegos o programas..." autocomplete="off"><label class="shop-sr-only" for="category">Filtrar categoría</label><select id="category"><option value="">Todas las categorías</option></select><label class="shop-sr-only" for="sort">Ordenar productos</label><select id="sort"><option value="name">Nombre A–Z</option><option value="price_asc">Menor precio</option><option value="price_desc">Mayor precio</option></select></div><p id="status" class="shop-info" role="status">Cargando catálogo...</p><div id="grid" class="shop-grid"></div><div id="empty" class="shop-empty" hidden>No se encontraron productos con esos filtros.</div></section>
+<section class="shop-wrap" aria-label="Catálogo"><div class="shop-controls"><label class="shop-sr-only" for="search">Buscar productos</label><input id="search" type="search" placeholder="Buscar juegos o programas..." autocomplete="off"><label class="shop-sr-only" for="category">Filtrar categoría</label><select id="category"><option value="">Todas las categorías</option></select><label class="shop-sr-only" for="sort">Ordenar productos</label><select id="sort"><option value="name">Nombre A–Z</option><option value="price_asc">Menor precio</option><option value="price_desc">Mayor precio</option></select></div><div class="a51-advanced"><label><input type="checkbox" id="a51OnlyFavorites"> ❤️ Solo favoritos</label><label><input type="checkbox" id="a51OnlyAvailable"> 💳 Con precio</label><label>Precio desde ($) <input id="a51PriceMin" type="number" min="0" step="1" placeholder="Mínimo"></label><label>Hasta ($) <input id="a51PriceMax" type="number" min="0" step="1" placeholder="Máximo"></label></div><p class="a51-local-note">❤️ Los favoritos y el carrito se guardan en este navegador. Si cambiás de dispositivo, no se sincronizan automáticamente. Los precios se verifican al pagar.</p><p id="status" class="shop-info" role="status">Cargando catálogo...</p><div id="grid" class="shop-grid"></div><div id="empty" class="shop-empty" hidden>No se encontraron productos con esos filtros.</div></section>
 <section class="shop-wrap a51-help" id="ayuda" aria-labelledby="a51-help-title">
 <h2 id="a51-help-title">👽 Todo lo que necesitás saber</h2>
 <p class="a51-help-lead">Antes de comprar y después de recibir tu juego, tenés estas indicaciones a mano.</p>
@@ -68,8 +69,12 @@ const $=id=>document.getElementById(id);
 const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
 const state={products:[],cart:new Set(),loaded:false};
 const CART_KEY='a51_shop_cart_draft_v1';
-try{const saved=JSON.parse(sessionStorage.getItem(CART_KEY)||'[]');if(Array.isArray(saved))saved.filter(x=>typeof x==='string').forEach(x=>state.cart.add(x));}catch{}
-function persist(){try{sessionStorage.setItem(CART_KEY,JSON.stringify([...state.cart]));}catch{}}
+const A51_FAV_KEY='a51_shop_favorites_v1';
+const favorites=new Set();
+try{const saved=JSON.parse(localStorage.getItem(A51_FAV_KEY)||'[]');if(Array.isArray(saved))saved.filter(x=>typeof x==='string').forEach(x=>favorites.add(x));}catch{}
+function saveFavorites(){try{localStorage.setItem(A51_FAV_KEY,JSON.stringify([...favorites]));}catch{}}
+try{const saved=JSON.parse(sessionStorage.getItem(CART_KEY)||localStorage.getItem(CART_KEY)||'[]');if(Array.isArray(saved))saved.filter(x=>typeof x==='string').forEach(x=>state.cart.add(x));}catch{}
+function persist(){const data=JSON.stringify([...state.cart]);try{sessionStorage.setItem(CART_KEY,data);}catch{}try{localStorage.setItem(CART_KEY,data);}catch{}}
 function priceOf(p){const n=p.price_ars;return Number.isSafeInteger(n)&&n>0?n:null;}
 function setText(el,text){el.textContent=text;}
 function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;}
@@ -140,13 +145,14 @@ $('testCheckoutButton').addEventListener('click',async()=>{
 });
 function render(){
  const q=$('search').value.trim().toLocaleLowerCase('es-AR');const category=$('category').value;const sort=$('sort').value;
- const products=state.products.filter(p=>(!category||p.category_id===category)&&(!q||(p.name+' '+p.category_name).toLocaleLowerCase('es-AR').includes(q)));
+ const onlyFav=$('a51OnlyFavorites')?.checked===true;const min=Number($('a51PriceMin')?.value||0),max=Number($('a51PriceMax')?.value||0);const onlyAvailable=$('a51OnlyAvailable')?.checked===true;
+ const products=state.products.filter(p=>(!category||p.category_id===category)&&(!q||(p.name+' '+p.category_name).toLocaleLowerCase('es-AR').includes(q))&&(!onlyFav||favorites.has(p.id))&&(!onlyAvailable||priceOf(p)!==null)&&(!(min>0)||(priceOf(p)!==null&&priceOf(p)>=min))&&(!(max>0)||(priceOf(p)!==null&&priceOf(p)<=max)));
  products.sort((a,b)=>sort==='price_asc'?(priceOf(a)??Infinity)-(priceOf(b)??Infinity)||a.name.localeCompare(b.name,'es'):sort==='price_desc'?(priceOf(b)??-1)-(priceOf(a)??-1)||a.name.localeCompare(b.name,'es'):a.name.localeCompare(b.name,'es'));
  $('grid').replaceChildren();$('empty').hidden=products.length>0;setText($('status'),`${products.length} productos encontrados · ${state.products.length} publicados`);
  for(const p of products){
   const card=el('article','shop-card');const coverLink=el('a','shop-cover');coverLink.href=productUrl(p);coverLink.setAttribute('aria-label','Ver '+p.name);
   if(p.cover_path){const img=el('img');img.src=a51_publicCoverUrl(p.cover_path);img.alt='Portada de '+p.name;img.loading='lazy';img.addEventListener('error',()=>{img.remove();coverLink.append(el('span','shop-placeholder','Portada no disponible'));},{once:true});coverLink.append(img);}else coverLink.append(el('span','shop-placeholder','Portada no disponible'));
-  const body=el('div','shop-card-body');body.append(el('span','shop-category',p.category_name||'Sin categoría'));const name=el('a','shop-name',p.name);name.href=productUrl(p);body.append(name);
+  const body=el('div','shop-card-body');const favorite=el('button','a51-favorite',favorites.has(p.id)?'❤️ Guardado':'🤍 Favorito');favorite.type='button';favorite.setAttribute('aria-label',favorites.has(p.id)?'Quitar de favoritos '+p.name:'Guardar en favoritos '+p.name);favorite.addEventListener('click',()=>{if(favorites.has(p.id))favorites.delete(p.id);else favorites.add(p.id);saveFavorites();render();});body.append(favorite);body.append(el('span','shop-category',p.category_name||'Sin categoría'));const name=el('a','shop-name',p.name);name.href=productUrl(p);body.append(name);
   const price=priceOf(p);body.append(price===null?el('div','shop-unpriced','Precio no disponible'):el('div','shop-price',money(price)));
   const actions=el('div','shop-card-actions');const details=el('a','shop-btn secondary','Ver ficha');details.href=productUrl(p);actions.append(details);
   const add=el('button','shop-btn',price===null?'No disponible':state.cart.has(p.id)?'✓ Agregado':'+ Agregar');add.type='button';add.disabled=price===null||state.cart.has(p.id);
@@ -154,7 +160,7 @@ function render(){
  }
 }
 function toggleCart(open){$('cartDrawer').classList.toggle('open',open);$('cartBackdrop').classList.toggle('open',open);$('cartDrawer').setAttribute('aria-hidden',String(!open));$('cartBackdrop').setAttribute('aria-hidden',String(!open));if(open){updateCart();$('closeCart').focus();}else $('openCart').focus();}
-$('openCart').addEventListener('click',()=>toggleCart(true));$('closeCart').addEventListener('click',()=>toggleCart(false));$('cartBackdrop').addEventListener('click',()=>toggleCart(false));document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('cartDrawer').classList.contains('open'))toggleCart(false);});['search','category','sort'].forEach(id=>$(id).addEventListener(id==='search'?'input':'change',render));
+$('openCart').addEventListener('click',()=>toggleCart(true));$('closeCart').addEventListener('click',()=>toggleCart(false));$('cartBackdrop').addEventListener('click',()=>toggleCart(false));document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('cartDrawer').classList.contains('open'))toggleCart(false);});['search','category','sort'].forEach(id=>$(id).addEventListener(id==='search'?'input':'change',render));['a51OnlyFavorites','a51PriceMin','a51PriceMax','a51OnlyAvailable'].forEach(id=>$(id)?.addEventListener('input',render));
 async function load(){
  try{
   if(typeof A51_CLIENT==='undefined'||typeof a51_publicCoverUrl!=='function')throw new Error('No se pudo iniciar la conexión pública de Supabase.');
