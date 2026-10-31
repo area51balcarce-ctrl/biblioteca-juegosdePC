@@ -27,8 +27,9 @@ header,main{width:min(1100px,calc(100% - 32px));margin:auto}header{display:flex;
 <script>
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
-async function api(action,options={}){
- const response=await fetch('/api/mis-compras?action='+encodeURIComponent(action),{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'},...options});
+async function api(action,options={},params={}){
+ const search=new URLSearchParams({action,...params});
+ const response=await fetch('/api/mis-compras?'+search.toString(),{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'},...options});
  const data=await response.json().catch(()=>({}));
  if(!response.ok){const error=new Error(data.error||'No se pudo consultar el servidor.');error.status=response.status;throw error;}
  return data;
@@ -71,7 +72,7 @@ async function load(){
    check.addEventListener('click',async()=>{
     check.disabled=true;state.textContent='Verificando compra con Mercado Pago...';delivery.replaceChildren();
     try{
-     const result=await api('customer-test-links&product_id='+encodeURIComponent(product.product_id));
+     const result=await api('customer-test-links',{}, {product_id:product.product_id});
      if(result.ok!==true||result.downloadsEnabled!==true)throw new Error('Entrega no habilitada');
      let count=0;
      for(const link of result.links||[]){
