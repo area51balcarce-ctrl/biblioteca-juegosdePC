@@ -383,6 +383,21 @@
 
     `;
 
+    // Recomendaciones públicas por categoría; no consultar descargas ni datos privados.
+    if(g.category && g.id && typeof A51_CLIENT!=='undefined'){
+      const holder=document.createElement('section');holder.style.cssText='max-width:1200px;margin:20px auto 60px;padding:20px;border:1px solid #274139;border-radius:14px';
+      const heading=document.createElement('h2');heading.textContent='🎮 También te pueden interesar';holder.append(heading);
+      const list=document.createElement('div');list.style.cssText='display:flex;flex-wrap:wrap;gap:12px';holder.append(list);
+      document.getElementById('app').append(holder);
+      try{
+        const cats=await A51_CLIENT.from('categories').select('id,name').eq('name',g.category).limit(1);
+        const catId=cats.data?.[0]?.id;
+        if(catId){const response=await A51_CLIENT.from('products').select('id,name,slug').eq('category_id',catId).eq('status','ok').neq('id',g.id).order('name').limit(6);
+          for(const item of response.data||[]){const a=document.createElement('a');a.href='/producto/?slug='+encodeURIComponent(item.slug);a.textContent='🎮 '+item.name;a.style.cssText='border:1px solid #31ef9b;padding:12px;border-radius:8px;color:#31ef9b;text-decoration:none';list.append(a);}
+        }
+        if(!list.childElementCount)holder.remove();
+      }catch(error){holder.remove();console.warn('AREA51 relacionados:',error);}
+    }
     bindInteractions();
     // Agregado aislado: mismo carrito de sesión del catálogo, sin modificar pagos.
     if(categoryPrice!==null && g.id && PUBLIC_BRAND.isPartner===false){
