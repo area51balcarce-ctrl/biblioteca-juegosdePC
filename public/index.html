@@ -51,7 +51,7 @@ function updateCart(){
  setText($('cartTotal'),money(items.reduce((sum,p)=>sum+priceOf(p),0)));
  $('liveCheckoutInfo').hidden=!liveCheckoutEnabled;
  $('liveCheckoutButton').hidden=!liveCheckoutEnabled||items.length===0;
- $('liveCheckoutButton').disabled=!liveCheckoutEnabled||items.length===0||items.length>100;
+ $('liveCheckoutButton').disabled=!liveCheckoutEnabled||items.length===0;
  // Pruebas aisladas: una sola unidad por pedido, sin alterar el carrito comercial.
  $('testCheckoutButton').hidden=true; // Mantener TEST funcional pero oculto al público.
  $('testCheckoutButton').disabled=true;
