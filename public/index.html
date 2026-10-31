@@ -60,10 +60,10 @@ $('testCheckoutButton').addEventListener('click',async()=>{
  if(!confirm('¿Iniciar una COMPRA DE PRUEBA de '+product.name+'?\\nEl importe se verificará en el servidor.'))return;
  button.disabled=true;note.hidden=false;note.textContent='Preparando Mercado Pago de prueba...';
  try{
-  const response=await fetch('/api/crear-preferencia',{
+  const response=await fetch('/api/mis-compras?action=customer-test-checkout',{
    method:'POST',credentials:'same-origin',cache:'no-store',
    headers:{'Content-Type':'application/json'},
-   body:JSON.stringify({email:'area51.balcarce@gmail.com',product_id:product.id})
+   body:JSON.stringify({product_id:product.id})
   });
   const data=await response.json();
   if(!response.ok||data.ok!==true||typeof data.sandbox_url!=='string'||
