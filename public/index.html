@@ -34,7 +34,7 @@ const $=id=>document.getElementById(id);
 const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(n);
 const state={products:[],cart:new Set(),loaded:false};
 const CART_KEY='a51_shop_cart_draft_v1';
-try{const saved=JSON.parse(sessionStorage.getItem(CART_KEY)||'[]');if(Array.isArray(saved))saved.filter(x=>typeof x==='string').slice(0,1000).forEach(x=>state.cart.add(x));}catch{}
+try{const saved=JSON.parse(sessionStorage.getItem(CART_KEY)||'[]');if(Array.isArray(saved))saved.filter(x=>typeof x==='string').forEach(x=>state.cart.add(x));}catch{}
 function persist(){try{sessionStorage.setItem(CART_KEY,JSON.stringify([...state.cart]));}catch{}}
 function priceOf(p){const n=p.price_ars;return Number.isSafeInteger(n)&&n>0?n:null;}
 function setText(el,text){el.textContent=text;}
@@ -50,8 +50,8 @@ function updateCart(){
  for(const p of items){const line=el('div','shop-cart-item');const info=el('div');info.append(el('strong','',p.name),el('small','',money(priceOf(p))));const remove=el('button','shop-btn secondary','Quitar');remove.type='button';remove.addEventListener('click',()=>{state.cart.delete(p.id);persist();updateCart();render();});line.append(info,remove);container.append(line);}
  setText($('cartTotal'),money(items.reduce((sum,p)=>sum+priceOf(p),0)));
  $('liveCheckoutInfo').hidden=!liveCheckoutEnabled;
- $('liveCheckoutButton').hidden=!liveCheckoutEnabled||items.length!==1;
- $('liveCheckoutButton').disabled=!liveCheckoutEnabled||items.length!==1;
+ $('liveCheckoutButton').hidden=!liveCheckoutEnabled||items.length===0;
+ $('liveCheckoutButton').disabled=!liveCheckoutEnabled||items.length===0||items.length>100;
  // Pruebas aisladas: una sola unidad por pedido, sin alterar el carrito comercial.
  $('testCheckoutButton').hidden=true; // Mantener TEST funcional pero oculto al público.
  $('testCheckoutButton').disabled=true;
@@ -59,15 +59,15 @@ function updateCart(){
 // AREA 51 — Compra real independiente; precio e identidad siempre verificados en servidor.
 $('liveCheckoutButton').addEventListener('click',async()=>{
  const items=cartProducts(),button=$('liveCheckoutButton'),note=$('liveCheckoutStatus');
- if(!liveCheckoutEnabled||items.length!==1)return;
- const product=items[0];
- if(!confirm('¿Comprar '+product.name+' con Mercado Pago? El importe final lo valida AREA 51.'))return;
+ if(!liveCheckoutEnabled||!items.length)return;
+ if(items.length>100){note.hidden=false;note.textContent='Podés guardar todos los juegos que quieras en el carrito, pero cada pago admite hasta 100. Dividí la compra en dos operaciones.';return;}
+ if(!confirm('¿Comprar '+items.length+' juego(s) por '+money(items.reduce((sum,p)=>sum+priceOf(p),0))+' con Mercado Pago? El total final se valida en AREA 51.'))return;
  button.disabled=true;note.hidden=false;note.textContent='Verificando sesión y preparando el pago...';
  try{
   const response=await fetch('/api/mis-compras?action=customer-live-checkout',{
    method:'POST',credentials:'same-origin',cache:'no-store',
    headers:{'Content-Type':'application/json'},
-   body:JSON.stringify({product_id:product.id})
+   body:JSON.stringify({product_ids:items.map(p=>p.id)})
   });
   const data=await response.json().catch(()=>({}));
   if(!response.ok||data.ok!==true||typeof data.payment_url!=='string'||!data.payment_url.startsWith('https://'))
