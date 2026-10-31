@@ -111,6 +111,7 @@ $('liveCheckoutButton').addEventListener('click',async()=>{
   const data=await response.json().catch(()=>({}));
   if(!response.ok||data.ok!==true||typeof data.payment_url!=='string'||!data.payment_url.startsWith('https://'))
    throw new Error(data.error||'No se pudo iniciar el pago.');
+  try{if(typeof data.order_id==='string')sessionStorage.setItem('a51_checkout_order_ref',data.order_id);}catch{}
   window.location.assign(data.payment_url);
  }catch(error){
   note.textContent='No se inició el pago: '+error.message;
