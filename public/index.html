@@ -54,8 +54,8 @@ function updateCart(){
  $('liveCheckoutButton').hidden=!liveCheckoutEnabled||items.length!==1||items[0]?.id!==livePilotProductId;
  $('liveCheckoutButton').disabled=!liveCheckoutEnabled||items.length!==1||items[0]?.id!==livePilotProductId;
  // Pruebas aisladas: una sola unidad por pedido, sin alterar el carrito comercial.
- $('testCheckoutButton').hidden=items.length!==1;
- $('testCheckoutButton').disabled=items.length!==1;
+ $('testCheckoutButton').hidden=true; // Mantener TEST funcional pero oculto al público.
+ $('testCheckoutButton').disabled=true;
 }
 // AREA 51 — Compra real independiente; precio e identidad siempre verificados en servidor.
 $('liveCheckoutButton').addEventListener('click',async()=>{
@@ -139,7 +139,13 @@ async function load(){
   if((productRes.data||[]).length===1000)setText($('status'),'Se muestran los primeros 1000 productos.');
  }catch(error){console.error('ÁREA 51 catálogo:',error);setText($('status'),'No se pudo cargar el catálogo. Actualizá la página para reintentar.');$('empty').hidden=false;setText($('empty'),'No pudimos consultar los productos en este momento.');}
 }
-load();
+load().then(()=>{
+ const params=new URLSearchParams(location.search);
+ if(params.get('cart')==='1'){
+  toggleCart(true);
+  history.replaceState(null,'',location.pathname);
+ }
+});
 })();
 </script>
 </body>
