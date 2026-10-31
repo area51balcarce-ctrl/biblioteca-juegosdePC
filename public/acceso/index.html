@@ -35,7 +35,7 @@ button:disabled{opacity:.5;cursor:wait}.secondary{background:#293456;color:white
 <button class="secondary" id="logout" type="button">Cerrar sesión</button>
 </div>
 <p id="status" role="status" aria-live="polite"></p><p><a id="libraryLink" href="/mi-biblioteca/" hidden style="color:#a7e8de">🛸 Ir a Mi Biblioteca</a></p>
-<small>El registro de clientes se habilitará cuando AREA 51 finalice las verificaciones. Los códigos vencen a los 10 minutos.</small>
+<small>Ingresá tu propio correo electrónico. Los códigos de acceso vencen a los 10 minutos.</small>
 </main>
 <script>
 'use strict';
@@ -64,7 +64,7 @@ function showSession(address){
 }
 async function refresh(){
   try{const data=await api('session');showSession(data.email)}
-  catch{request.hidden=false;verify.hidden=true;signed.hidden=true}
+  catch{request.hidden=false;verify.hidden=true;signed.hidden=true;email.value='';}
 }
 request.addEventListener('submit',async event=>{
   if(!registrationEnabled){event.preventDefault();message('El registro público todavía no está habilitado.');return;}
@@ -85,7 +85,7 @@ verify.addEventListener('submit',async event=>{
   finally{busy(verify,false)}
 });
 document.getElementById('logout').addEventListener('click',async()=>{
-  try{await api('logout',{});signed.hidden=true;verify.hidden=true;request.hidden=false;message('Sesión cerrada.')}
+  try{await api('logout',{});signed.hidden=true;verify.hidden=true;request.hidden=false;email.value='';document.getElementById('code').value='';message('Sesión cerrada.')}
   catch(error){message(error.message)}
 });
 fetch('/api/mis-compras?action=live-checkout-status',{credentials:'same-origin',cache:'no-store'})
