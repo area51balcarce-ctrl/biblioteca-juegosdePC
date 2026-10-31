@@ -26,6 +26,17 @@ export default async function handler(req, res) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   const action = typeof req.query?.action === 'string' ? req.query.action : '';
 
+  // Estado publico del checkout real: solo indicadores, nunca credenciales.
+  if (action === 'live-checkout-status') {
+    res.setHeader('Allow', 'GET');
+    if (req.method !== 'GET') return res.status(405).json({ok:false,error:'Método no permitido.'});
+    return res.status(200).json({
+      ok:true,
+      enabled:process.env.AREA51_LIVE_CHECKOUT_ENABLED === 'true' &&
+        process.env.AREA51_PUBLIC_CUSTOMER_REGISTRATION === 'true'
+    });
+  }
+
   // AREA 51 — Biblioteca privada con nueva sesión.
   // Checkout de prueba con identidad obtenida SOLO de la sesion OTP.
   // Reutiliza el handler existente; no modifica su ruta ni habilita cobros reales.
