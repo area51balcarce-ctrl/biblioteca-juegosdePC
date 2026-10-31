@@ -8,6 +8,7 @@ import testCheckoutHandler from './crear-preferencia.js';
 import { magnetFromTorrent } from '../lib/pc/torrent-magnet.js';
 import liveCheckout from '../lib/pc/live-checkout.js';
 import livePaymentWebhook from '../lib/pc/live-payment-webhook.js';
+import customerLiveLinks from '../lib/pc/customer-live-links.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function headers(key) { return { apikey: key, Authorization: `Bearer ${key}`, Accept: 'application/json' }; }
@@ -62,6 +63,9 @@ export default async function handler(req, res) {
       return res.status(502).json({ok:false,error:'No se pudo verificar la sesion.'});
     }
   }
+  // Entrega real aislada; no modifica las descargas TEST existentes.
+  if (action === 'customer-live-links') return customerLiveLinks(req,res);
+
   if (action === 'customer-library') {
     return customerLibraryHandler(req, res);
   }
