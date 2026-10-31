@@ -398,6 +398,19 @@
         if(!list.childElementCount)holder.remove();
       }catch(error){holder.remove();console.warn('AREA51 relacionados:',error);}
     }
+    // Lista de espera: no promete envío automático hasta configurar proveedor de correo.
+    if(g.id && PUBLIC_BRAND.isPartner===false){
+      const section=document.createElement('section');section.style.cssText='max-width:1200px;margin:16px auto;padding:18px;border:1px solid #274139;border-radius:12px';
+      const h=document.createElement('h2');h.textContent='🔔 Seguimiento de disponibilidad';section.append(h);
+      const note=document.createElement('p');note.textContent='Guardá tu interés en este juego. Los avisos por correo todavía no están habilitados.';section.append(note);
+      const button=document.createElement('button');button.type='button';button.className='btn btn-primary';button.textContent='🔔 Guardar interés';section.append(button);
+      const msg=document.createElement('p');msg.setAttribute('role','status');section.append(msg);
+      document.getElementById('app').append(section);
+      const call=async(method)=>{const r=await fetch('/api/mis-compras?action=availability-alerts'+(method==='GET'?'&product_id='+encodeURIComponent(g.id):''),{method,credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},...(method==='GET'?{}:{body:JSON.stringify({product_id:g.id})})});const data=await r.json().catch(()=>({}));if(!r.ok)throw Error(data.error||'Error de sesión');return data;};
+      let subscribed=false;
+      button.addEventListener('click',async()=>{button.disabled=true;try{const data=await call(subscribed?'DELETE':'POST');subscribed=data.subscribed;button.textContent=subscribed?'🔕 Quitar seguimiento':'🔔 Guardar interés';msg.textContent=subscribed?'Interés guardado en tu cuenta. El envío de correos todavía no está habilitado.':'Seguimiento eliminado.';}catch(e){msg.textContent=e.message+' · Ingresá desde Acceso de clientes.';}finally{button.disabled=false;}});
+      call('GET').then(data=>{subscribed=data.subscribed;button.textContent=subscribed?'🔕 Quitar seguimiento':'🔔 Guardar interés';}).catch(()=>{});
+    }
     bindInteractions();
     // Agregado aislado: mismo carrito de sesión del catálogo, sin modificar pagos.
     if(categoryPrice!==null && g.id && PUBLIC_BRAND.isPartner===false){
