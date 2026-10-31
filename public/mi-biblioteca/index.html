@@ -22,6 +22,7 @@ header,main{width:min(1100px,calc(100% - 32px));margin:auto}header{display:flex;
 <section class="card" id="account" hidden><strong>Cuenta autenticada:</strong> <span id="email"></span><div style="margin-top:16px"><button type="button" id="logout">Cerrar sesión</button></div></section>
 <section class="card"><h2>📥 Centro de ayuda para descargas</h2><details><summary>🔗 Descarga directa</summary><p>Abrí el enlace de tu juego y guardá los archivos en tu PC. Si hay varias partes, descargá todas antes de seguir las instrucciones del producto.</p></details><details><summary>🧲 Archivo .torrent</summary><p>Instalá qBittorrent desde el botón oficial de arriba. Descargá el archivo .torrent de tu biblioteca y abrilo con qBittorrent. Elegí una carpeta y esperá que finalice la transferencia.</p></details><details><summary>🛸 Enlace magnet</summary><p>Con qBittorrent instalado, pulsá «Abrir MAGNET» y aceptá abrir el enlace en el programa. Elegí dónde guardar los archivos.</p></details><details><summary>❓ Si la descarga no comienza</summary><p>Revisá tu conexión, el espacio disponible y que qBittorrent esté abierto. La disponibilidad de pares o fuentes externas puede afectar la transferencia. Si el enlace no funciona, contactá a soporte.</p></details><p><a href="mailto:area51.balcarce@gmail.com?subject=Ayuda%20con%20descarga%20PC">✉️ Pedir ayuda a AREA 51</a></p></section>
 <section class="card" id="unauthorized" hidden><h2>Iniciá sesión para ver tus juegos</h2><p>El acceso se realiza mediante el correo autorizado de AREA 51.</p><a href="/test-acceso/">🔑 Ir al acceso privado</a> <a href="/acceso/" style="margin-left:12px">👽 Acceso de clientes</a></section>
+<section class="card" id="a51History"><h2>🧾 Historial de compras</h2><p>Consultá tus pedidos y su estado. Solo se muestran operaciones asociadas a tu cuenta.</p><button type="button" id="a51LoadHistory">Ver mis pedidos</button><div id="a51HistoryResult" aria-live="polite"></div></section>
 <p id="message" role="status" aria-live="polite">Consultando tu biblioteca...</p>
 <section class="grid" id="games" aria-label="Juegos de mi biblioteca"></section>
 <footer>AREA 51 Balcarce · Biblioteca PC. Esta página no entrega enlaces de descarga.</footer>
@@ -143,6 +144,12 @@ async function load(){
   }
  }catch(error){if(error.status===401||error.status===403)showUnauthorized('No hay una sesión activa para esta biblioteca.');else $('message').textContent='No se pudo cargar la biblioteca. '+error.message;}
 }
+$('a51LoadHistory').addEventListener('click',async()=>{
+ const btn=$('a51LoadHistory'),target=$('a51HistoryResult');btn.disabled=true;target.replaceChildren();target.textContent='Consultando pedidos...';
+ try{const data=await api('customer-order-history');target.replaceChildren();if(!data.orders?.length){target.textContent='Todavía no tenés pedidos registrados.';return;}
+ for(const order of data.orders){const wrap=document.createElement('div');wrap.style.cssText='border-top:1px solid #565080;padding:14px 0;margin-top:12px';const title=document.createElement('strong');const status={paid:'✅ Acreditado',pending:'⏳ Pendiente',cancelled:'❌ Cancelado',refunded:'↩️ Reintegrado'}[order.status]||order.status;title.textContent=status+' · '+new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0}).format(order.total_ars||0);wrap.append(title);const info=document.createElement('p');const date=new Date(order.created_at);info.textContent='Pedido: '+order.id+' · '+(Number.isNaN(date.getTime())?'':date.toLocaleDateString('es-AR'));wrap.append(info);for(const item of order.items||[]){const p=document.createElement('p');p.textContent='🎮 '+item.name+(item.quantity>1?' ×'+item.quantity:'');wrap.append(p);}target.append(wrap);}
+ }catch(error){target.textContent='No se pudo consultar el historial: '+error.message;}finally{btn.disabled=false;}
+});
 $('logout').addEventListener('click',async()=>{
  const button=$('logout');button.disabled=true;
  try{await api('customer-logout',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:'{}'});showUnauthorized('Sesión cerrada correctamente.');}
