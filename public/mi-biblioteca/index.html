@@ -18,7 +18,9 @@ header,main{width:min(1100px,calc(100% - 32px));margin:auto}header{display:flex;
 <p>Tus juegos y sus opciones de descarga, disponibles en tu cuenta.</p>
 <div class="pill">🔐 Acceso privado a tus juegos</div>
 <section class="card" style="margin-top:16px"><strong>🧲 ¿No tenés qBittorrent instalado?</strong><p>Para abrir archivos .torrent o enlaces magnet, instalá qBittorrent desde su página oficial.</p><a href="https://www.qbittorrent.org/download" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#a5e9de;color:#0b2030;border-radius:10px;padding:12px 16px;font-weight:700;text-decoration:none">⬇️ Descargar qBittorrent (web oficial)</a></section>
+<section class="card" id="a51PaymentReturn" hidden aria-live="polite"><strong>💳 Regreso desde Mercado Pago</strong><p>Tu pago está siendo verificado. La confirmación válida es la acreditación en AREA 51; volver desde Mercado Pago no significa que ya esté aprobado.</p><p id="a51PaymentReference"></p><p>Si tu juego todavía no aparece, esperá unos instantes y actualizá Mi Biblioteca. Si persiste, contactá a soporte.</p><a href="/mis-compras/">Consultar Mis Compras</a></section>
 <section class="card" id="account" hidden><strong>Cuenta autenticada:</strong> <span id="email"></span><div style="margin-top:16px"><button type="button" id="logout">Cerrar sesión</button></div></section>
+<section class="card"><h2>📥 Centro de ayuda para descargas</h2><details><summary>🔗 Descarga directa</summary><p>Abrí el enlace de tu juego y guardá los archivos en tu PC. Si hay varias partes, descargá todas antes de seguir las instrucciones del producto.</p></details><details><summary>🧲 Archivo .torrent</summary><p>Instalá qBittorrent desde el botón oficial de arriba. Descargá el archivo .torrent de tu biblioteca y abrilo con qBittorrent. Elegí una carpeta y esperá que finalice la transferencia.</p></details><details><summary>🛸 Enlace magnet</summary><p>Con qBittorrent instalado, pulsá «Abrir MAGNET» y aceptá abrir el enlace en el programa. Elegí dónde guardar los archivos.</p></details><details><summary>❓ Si la descarga no comienza</summary><p>Revisá tu conexión, el espacio disponible y que qBittorrent esté abierto. La disponibilidad de pares o fuentes externas puede afectar la transferencia. Si el enlace no funciona, contactá a soporte.</p></details><p><a href="mailto:area51.balcarce@gmail.com?subject=Ayuda%20con%20descarga%20PC">✉️ Pedir ayuda a AREA 51</a></p></section>
 <section class="card" id="unauthorized" hidden><h2>Iniciá sesión para ver tus juegos</h2><p>El acceso se realiza mediante el correo autorizado de AREA 51.</p><a href="/test-acceso/">🔑 Ir al acceso privado</a> <a href="/acceso/" style="margin-left:12px">👽 Acceso de clientes</a></section>
 <p id="message" role="status" aria-live="polite">Consultando tu biblioteca...</p>
 <section class="grid" id="games" aria-label="Juegos de mi biblioteca"></section>
@@ -61,6 +63,7 @@ async function load(){
    }
    const detail=document.createElement('div');detail.className='detail';
    const title=document.createElement('h2');title.textContent=typeof product.name==='string'?product.name:'Juego';detail.append(title);
+   const support=document.createElement('a');support.textContent='✉️ Soporte por este juego';support.href='mailto:area51.balcarce@gmail.com?subject='+encodeURIComponent('Soporte AREA 51 PC - '+(product.name||'Juego'))+'&body='+encodeURIComponent('Hola AREA 51, necesito asistencia con el juego: '+(product.name||'Juego')+'\n\nMi consulta es: \n');support.style.display='inline-block';support.style.margin='8px 0';detail.append(support);
    if(typeof product.granted_at==='string'){
     const date=new Date(product.granted_at);
     if(!Number.isNaN(date.getTime())){const p=document.createElement('p');p.textContent='Registrado: '+date.toLocaleDateString('es-AR');detail.append(p);}
@@ -146,6 +149,7 @@ $('logout').addEventListener('click',async()=>{
  catch(error){$('message').textContent='No se pudo cerrar sesión: '+error.message;}
  finally{button.disabled=false;}
 });
+const params=new URLSearchParams(location.search);if(['payment_id','collection_id','collection_status','status','merchant_order_id','preference_id','external_reference'].some(k=>params.has(k))){$('a51PaymentReturn').hidden=false;try{const ref=sessionStorage.getItem('a51_checkout_order_ref');if(ref&&/^[0-9a-f-]{36}$/i.test(ref))$('a51PaymentReference').textContent='Referencia de pedido: '+ref;}catch{}}
 load();
 })();
 </script>
