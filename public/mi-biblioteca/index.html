@@ -93,6 +93,48 @@ async function load(){
     }catch(error){state.textContent='🔒 No se pudo verificar la entrega: '+error.message;}
     finally{check.disabled=false;}
    });
+   // Entrega de producción independiente: el botón TEST permanece intacto.
+   if(data.liveDeliveryEnabled===true){
+     const realButton=document.createElement('button');
+     realButton.type='button';
+     realButton.textContent='🛸 Ver entrega de compra real';
+     realButton.style.marginTop='12px';
+     realButton.style.marginLeft='8px';
+     detail.append(realButton);
+     realButton.addEventListener('click',async()=>{
+       realButton.disabled=true;
+       state.textContent='Validando compra real con Mercado Pago...';
+       delivery.replaceChildren();
+       try{
+         const result=await api('customer-live-links',{}, {product_id:product.product_id});
+         if(result.ok!==true||result.downloadsEnabled!==true)throw new Error('Entrega no habilitada');
+         let count=0;
+         for(const link of result.links||[]){
+           if(typeof link.url!=='string'||!(/^(https:\\/\\/|magnet:\\?)/i).test(link.url))continue;
+           const item=document.createElement('a');
+           item.href=link.url;item.textContent='🔗 '+(link.label||link.group_name||'Enlace de descarga');
+           item.target='_blank';item.rel='noopener noreferrer';
+           item.style.display='block';item.style.marginTop='8px';
+           delivery.append(item);count++;
+         }
+         if(result.torrent&&typeof result.torrent.url==='string'&&result.torrent.url.startsWith('https://')){
+           const torrent=document.createElement('a');
+           torrent.href=result.torrent.url;torrent.textContent='🧲 Descargar torrent (enlace temporal)';
+           torrent.target='_blank';torrent.rel='noopener noreferrer';
+           torrent.style.display='block';torrent.style.marginTop='8px';
+           delivery.append(torrent);count++;
+           if(typeof result.torrent.magnet==='string'&&/^magnet:[?]xt=urn:btih:[a-f0-9]{40}(?:&|$)/i.test(result.torrent.magnet)){
+             const magnet=document.createElement('a');
+             magnet.href=result.torrent.magnet;magnet.textContent='🧲 Abrir MAGNET';
+             magnet.style.display='block';magnet.style.marginTop='8px';
+             delivery.append(magnet);count++;
+           }
+         }
+         state.textContent=count?'✅ Opciones de entrega verificadas: '+count:'📦 Sin fuentes disponibles por ahora.';
+       }catch(error){state.textContent='🔒 Entrega real no disponible: '+error.message;}
+       finally{realButton.disabled=false;}
+     });
+   }
    article.append(art,detail);games.append(article);
   }
  }catch(error){if(error.status===401||error.status===403)showUnauthorized('No hay una sesión activa para esta biblioteca.');else $('message').textContent='No se pudo cargar la biblioteca. '+error.message;}
