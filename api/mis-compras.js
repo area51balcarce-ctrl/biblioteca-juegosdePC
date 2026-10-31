@@ -11,6 +11,7 @@ import livePaymentWebhook from '../lib/pc/live-payment-webhook.js';
 import customerLiveLinks from '../lib/pc/customer-live-links.js';
 import adminClients from '../lib/pc/admin-clients.js';
 import customerPreferences from '../lib/pc/customer-preferences.js';
+import customerOrderHistory from '../lib/pc/customer-order-history.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function headers(key) { return { apikey: key, Authorization: `Bearer ${key}`, Accept: 'application/json' }; }
@@ -30,6 +31,7 @@ export default async function handler(req, res) {
 
   if (action === 'admin-clients') return adminClients(req,res);
   if (action === 'customer-preferences') return customerPreferences(req,res);
+  if (action === 'customer-order-history') return customerOrderHistory(req,res);
 
   // Estado publico del checkout real: solo indicadores, nunca credenciales.
   if (action === 'live-checkout-status') {
