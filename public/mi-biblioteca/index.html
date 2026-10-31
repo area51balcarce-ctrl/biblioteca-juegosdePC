@@ -83,7 +83,7 @@ async function load(){
      if(result.torrent&&typeof result.torrent.url==='string'&&result.torrent.url.startsWith('https://')){
       const a=document.createElement('a');a.href=result.torrent.url;a.textContent='🧲 Descargar torrent (enlace temporal)';
       a.target='_blank';a.rel='noopener noreferrer';a.style.display='block';a.style.marginTop='8px';delivery.append(a);count++;
-      if(typeof result.torrent.magnet==='string'&&/^magnet:\\?xt=urn:btih:[a-f0-9]{40}(?:&|$)/i.test(result.torrent.magnet)){
+      if(typeof result.torrent.magnet==='string'&&/^magnet:[?]xt=urn:btih:[a-f0-9]{40}(?:&|$)/i.test(result.torrent.magnet)){
        const magnet=document.createElement('a');magnet.href=result.torrent.magnet;
        magnet.textContent='🧲 Abrir MAGNET en qBittorrent / uTorrent';
        magnet.style.display='block';magnet.style.marginTop='8px';delivery.append(magnet);count++;
