@@ -42,7 +42,6 @@ function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className
 function productUrl(p){return '/producto/?slug='+encodeURIComponent(p.slug);}
 function cartProducts(){return state.products.filter(p=>state.cart.has(p.id)&&priceOf(p)!==null);}
 let liveCheckoutEnabled=false;
-let livePilotProductId='';
 function updateCart(){
  const valid=new Set(state.products.filter(p=>priceOf(p)!==null).map(p=>p.id));
  if(state.loaded){for(const id of [...state.cart])if(!valid.has(id))state.cart.delete(id);persist();}
@@ -51,8 +50,8 @@ function updateCart(){
  for(const p of items){const line=el('div','shop-cart-item');const info=el('div');info.append(el('strong','',p.name),el('small','',money(priceOf(p))));const remove=el('button','shop-btn secondary','Quitar');remove.type='button';remove.addEventListener('click',()=>{state.cart.delete(p.id);persist();updateCart();render();});line.append(info,remove);container.append(line);}
  setText($('cartTotal'),money(items.reduce((sum,p)=>sum+priceOf(p),0)));
  $('liveCheckoutInfo').hidden=!liveCheckoutEnabled;
- $('liveCheckoutButton').hidden=!liveCheckoutEnabled||items.length!==1||items[0]?.id!==livePilotProductId;
- $('liveCheckoutButton').disabled=!liveCheckoutEnabled||items.length!==1||items[0]?.id!==livePilotProductId;
+ $('liveCheckoutButton').hidden=!liveCheckoutEnabled||items.length!==1;
+ $('liveCheckoutButton').disabled=!liveCheckoutEnabled||items.length!==1;
  // Pruebas aisladas: una sola unidad por pedido, sin alterar el carrito comercial.
  $('testCheckoutButton').hidden=true; // Mantener TEST funcional pero oculto al público.
  $('testCheckoutButton').disabled=true;
@@ -82,7 +81,6 @@ $('liveCheckoutButton').addEventListener('click',async()=>{
 fetch('/api/mis-compras?action=live-checkout-status',{credentials:'same-origin',cache:'no-store'})
  .then(r=>r.ok?r.json():null).then(data=>{
   liveCheckoutEnabled=data?.enabled===true;
-  livePilotProductId=typeof data?.pilotProductId==='string'?data.pilotProductId:'';
   $('checkoutAvailabilityNotice').textContent=liveCheckoutEnabled?'🔐 Pagos con Mercado Pago disponibles. El importe final se valida en el servidor.':'Las compras online se habilitarán cuando finalice la verificación de pagos. El importe se valida en el servidor.';
   updateCart();
  }).catch(()=>{liveCheckoutEnabled=false;updateCart();});
