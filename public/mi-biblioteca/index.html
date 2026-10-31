@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#101918"><link rel="icon" type="image/svg+xml" href="/assets/area51-app-icon.svg">
 <meta name="robots" content="noindex,nofollow">
 <title>Mis juegos | AREA 51 PC</title>
 <style>
@@ -160,5 +161,6 @@ const params=new URLSearchParams(location.search);if(['payment_id','collection_i
 load();
 })();
 </script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));}</script>
 </body>
 </html>
