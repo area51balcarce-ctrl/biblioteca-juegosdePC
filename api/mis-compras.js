@@ -33,7 +33,9 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok:true,
       enabled:process.env.AREA51_LIVE_CHECKOUT_ENABLED === 'true' &&
-        process.env.AREA51_PUBLIC_CUSTOMER_REGISTRATION === 'true'
+        process.env.AREA51_PUBLIC_CUSTOMER_REGISTRATION === 'true',
+      registrationEnabled:process.env.AREA51_PUBLIC_CUSTOMER_REGISTRATION === 'true' &&
+        process.env.AREA51_CUSTOMER_AUTH_ENABLED === 'true'
     });
   }
 
