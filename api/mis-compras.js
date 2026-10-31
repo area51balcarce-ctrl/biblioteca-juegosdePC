@@ -627,7 +627,12 @@ export default async function handler(req, res) {
             // Magnet opcional: extraer infohash del .torrent privado.
             // La descarga tradicional sigue disponible si falla esta lectura.
             try {
-              const raw = await fetch(torrent.url, { signal: AbortSignal.timeout(10000) });
+              const privateUrl = base + '/storage/v1/object/product-files/' +
+                file.file_main_path.split('/').map(encodeURIComponent).join('/');
+              const raw = await fetch(privateUrl, {
+                headers: { Authorization: 'Bearer ' + key, apikey: key },
+                signal: AbortSignal.timeout(10000)
+              });
               const size = Number(raw.headers.get('content-length') || 0);
               if (!raw.ok || size > 4 * 1024 * 1024) throw new Error('Torrent no legible');
               const bytes = await raw.arrayBuffer();
