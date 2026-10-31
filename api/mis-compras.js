@@ -35,9 +35,7 @@ export default async function handler(req, res) {
       enabled:process.env.AREA51_LIVE_CHECKOUT_ENABLED === 'true' &&
         process.env.AREA51_PUBLIC_CUSTOMER_REGISTRATION === 'true',
       registrationEnabled:process.env.AREA51_PUBLIC_CUSTOMER_REGISTRATION === 'true' &&
-        process.env.AREA51_CUSTOMER_AUTH_ENABLED === 'true',
-      pilotProductId:process.env.AREA51_LIVE_CHECKOUT_ENABLED === 'true' ?
-        (process.env.AREA51_LIVE_PILOT_PRODUCT_ID || '') : ''
+        process.env.AREA51_CUSTOMER_AUTH_ENABLED === 'true'
     });
   }
 
