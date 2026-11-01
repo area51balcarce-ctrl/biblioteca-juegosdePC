@@ -3,6 +3,7 @@
 create or replace function public.a51_notify_published_product()
 returns trigger
 language plpgsql
+security definer
 set search_path = public
 as $$
 begin
