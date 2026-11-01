@@ -150,6 +150,34 @@ body{
  .shop-card:hover{transform:none}
  .shop-btn:hover:not(:disabled){transform:none}
 }
+
+/* AREA 51 - ETAPA 4: terminaciones premium (solo presentacion). */
+@keyframes a51-premium-pulse{0%,100%{opacity:.58}50%{opacity:1}}
+@keyframes a51-premium-scan{to{transform:rotate(360deg)}}
+.shop-header .shop-logo span{animation:a51-premium-pulse 3.4s ease-in-out infinite}
+.shop-btn{position:relative}
+.shop-btn:focus-visible,.shop-cover:focus-visible,.shop-card a:focus-visible{outline:2px solid #8bff61;outline-offset:3px}
+.shop-card{isolation:isolate}
+.shop-card:hover .shop-cover img{filter:saturate(1.07) brightness(1.04)}
+.shop-cover img{transition:filter .25s ease}
+.shop-info.a51-premium-loading{display:flex;align-items:center;gap:11px;color:#b4ff9b}
+.shop-info.a51-premium-loading::before{
+ content:"";display:inline-block;flex:none;width:17px;height:17px;
+ border:2px solid rgba(72,250,22,.23);border-top-color:#67ff37;border-radius:50%;
+ animation:a51-premium-scan .85s linear infinite;
+}
+.shop-empty.a51-premium-empty{
+ text-align:center;padding:30px 20px;background:radial-gradient(ellipse at 50% 0%,rgba(229,10,168,.1),transparent 75%),#0d1012;
+ border:1px dashed #a53788;box-shadow:inset 0 0 20px rgba(229,10,168,.05);
+}
+.shop-empty.a51-premium-empty strong{display:block;color:#a5ff84;font-size:1.12rem;margin-bottom:7px}
+.shop-empty.a51-premium-empty p{margin:7px 0;color:#b7c6b8}
+.shop-empty.a51-premium-empty .shop-btn{margin-top:12px}
+@media(hover:none){.shop-card:hover .shop-cover img{filter:none}}
+@media(prefers-reduced-motion:reduce){
+ .shop-header .shop-logo span,.shop-info.a51-premium-loading::before{animation:none}
+ .shop-cover img{transition:none}
+}
 </style>
 </head>
 <body>
@@ -165,7 +193,7 @@ body{
 <div class="a51-step"><strong>03 · 💳 Pagá</strong><p>Completá el pago de forma segura mediante Mercado Pago.</p></div>
 <div class="a51-step"><strong>04 · 🛸 Accedé</strong><p>Cuando se acredite tu compra, ingresá con tu correo a <a href="/mi-biblioteca/" style="color:#67edbb;text-decoration:underline">Mi Biblioteca</a> para consultar tus juegos.</p></div>
 </div></section>
-<section class="shop-wrap" aria-label="Catálogo"><div class="shop-controls"><label class="shop-sr-only" for="search">Buscar productos</label><input id="search" type="search" placeholder="Buscar juegos o programas..." autocomplete="off"><label class="shop-sr-only" for="category">Filtrar categoría</label><select id="category"><option value="">Todas las categorías</option></select><label class="shop-sr-only" for="sort">Ordenar productos</label><select id="sort"><option value="name">Nombre A–Z</option><option value="price_asc">Menor precio</option><option value="price_desc">Mayor precio</option></select></div><div class="a51-advanced"><label><input type="checkbox" id="a51OnlyFavorites"> ❤️ Solo favoritos</label><label><input type="checkbox" id="a51OnlyAvailable"> 💳 Con precio</label><label>Precio desde ($) <input id="a51PriceMin" type="number" min="0" step="1" placeholder="Mínimo"></label><label>Hasta ($) <input id="a51PriceMax" type="number" min="0" step="1" placeholder="Máximo"></label></div><p class="a51-local-note">❤️ Tus favoritos y tu carrito se sincronizan entre dispositivos al iniciar sesión con el mismo correo. Sin sesión, se guardan en este navegador. Los precios se verifican al pagar.</p><p id="status" class="shop-info" role="status">Cargando catálogo...</p><div id="grid" class="shop-grid"></div><div id="empty" class="shop-empty" hidden>No se encontraron productos con esos filtros.</div></section>
+<section class="shop-wrap" aria-label="Catálogo"><div class="shop-controls"><label class="shop-sr-only" for="search">Buscar productos</label><input id="search" type="search" placeholder="Buscar juegos o programas..." autocomplete="off"><label class="shop-sr-only" for="category">Filtrar categoría</label><select id="category"><option value="">Todas las categorías</option></select><label class="shop-sr-only" for="sort">Ordenar productos</label><select id="sort"><option value="name">Nombre A–Z</option><option value="price_asc">Menor precio</option><option value="price_desc">Mayor precio</option></select></div><div class="a51-advanced"><label><input type="checkbox" id="a51OnlyFavorites"> ❤️ Solo favoritos</label><label><input type="checkbox" id="a51OnlyAvailable"> 💳 Con precio</label><label>Precio desde ($) <input id="a51PriceMin" type="number" min="0" step="1" placeholder="Mínimo"></label><label>Hasta ($) <input id="a51PriceMax" type="number" min="0" step="1" placeholder="Máximo"></label></div><p class="a51-local-note">❤️ Tus favoritos y tu carrito se sincronizan entre dispositivos al iniciar sesión con el mismo correo. Sin sesión, se guardan en este navegador. Los precios se verifican al pagar.</p><p id="status" class="shop-info a51-premium-loading" role="status">🛸 Conectando con AREA 51...</p><div id="grid" class="shop-grid"></div><div id="empty" class="shop-empty a51-premium-empty" hidden><strong>👽 No encontramos este título en nuestra galaxia.</strong><p>Probá con otra búsqueda o solicitá el juego desde PEDIDOS.</p><button type="button" class="shop-btn secondary" id="a51PremiumRequestShortcut">📩 Ir a PEDIDOS</button></div></section>
 <section class="shop-wrap a51-help" id="ayuda" aria-labelledby="a51-help-title">
 <h2 id="a51-help-title">👽 Todo lo que necesitás saber</h2>
 <p class="a51-help-lead">Antes de comprar y después de recibir tu juego, tenés estas indicaciones a mano.</p>
@@ -361,6 +389,24 @@ form.addEventListener('submit',async e=>{
   status.textContent='✅ '+data.message;form.reset();
  }catch(error){status.textContent=error.message;}finally{submit.disabled=false;}
 });
+})();
+</script>
+
+<script>
+/* AREA 51 - ETAPA 4: mejora visual aislada; reutiliza el boton PEDIDOS existente. */
+(()=>{
+ 'use strict';
+ const status=document.getElementById('status');
+ if(status){
+  const observer=new MutationObserver(()=>{
+   const loading=/^(?:🛸\s*)?Conectando con AREA 51|Cargando cat[aá]logo/i.test(status.textContent.trim());
+   status.classList.toggle('a51-premium-loading',loading);
+  });
+  observer.observe(status,{childList:true,characterData:true,subtree:true});
+ }
+ document.getElementById('a51PremiumRequestShortcut')?.addEventListener('click',()=>{
+  document.getElementById('a51OpenRequests')?.click();
+ });
 })();
 </script>
 </body>
