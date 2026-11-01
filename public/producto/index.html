@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title id="page-title">Ficha de producto — ÁREA 51</title>
+<title id="page-title">Ficha de producto — AREA 51</title>
 <link rel="stylesheet" href="../assets/style.css">
 <style>
   .hero{
@@ -100,13 +100,79 @@
   .empty-state .eyebrow{ justify-content:center; }
   .empty-state h1{ font-size:26px; }
   .empty-state p{ color:var(--text-dim); max-width:46ch; }
+
+/* AREA 51 | Ficha de producto: identidad visual del catalogo principal.
+   Cambios de presentacion exclusivamente; conserva funciones y marcas de proveedores. */
+:root{
+ --bg:#050608;--bg-elev:#0e1014;--bg-panel:#121118;--bg-panel-2:#17131c;
+ --line:#344d33;--line-bright:#496a3d;
+ --text:#f2fff0;--text-dim:#b0c5b5;--text-faint:#8b9d91;
+ --accent:#6cff36;--accent-soft:rgba(108,255,54,.13);--accent-dim:#3b8f25;
+ --radius:8px;
+}
+body{background:#050608;color:var(--text)}
+.a51-scanbg{
+ background:
+ radial-gradient(ellipse at 10% 0%,rgba(72,250,22,.10),transparent 45%),
+ radial-gradient(ellipse at 94% 80%,rgba(229,10,168,.10),transparent 47%),
+ radial-gradient(circle at 14% 22%,rgba(255,255,255,.2) 0 1px,transparent 1.5px),
+ radial-gradient(circle at 77% 68%,rgba(255,255,255,.15) 0 1px,transparent 1.5px),
+ #050608;
+ background-size:auto,auto,271px 277px,347px 353px,auto;
+}
+.a51-header{
+ background:rgba(6,8,11,.96);border-bottom:1px solid rgba(108,255,54,.5);
+ box-shadow:0 4px 18px rgba(72,250,22,.1);
+ padding-top:19px;padding-bottom:19px;
+}
+.a51-header::before{
+ content:"";position:absolute;top:0;left:0;right:0;height:3px;
+ background:linear-gradient(90deg,#48fa16 0%,#83ff50 55%,#e50aa8 100%);
+}
+.a51-brand{color:#f5fff3;font-family:var(--f-body);font-weight:900;letter-spacing:.06em}
+.a51-brand .dot{background:#48fa16;box-shadow:0 0 12px rgba(72,250,22,.8)}
+.a51-tag{color:#a3b5ad}
+.hero{background:radial-gradient(ellipse at 18% 0%,rgba(72,250,22,.13),transparent 55%),radial-gradient(ellipse at 90% 40%,rgba(229,10,168,.08),transparent 50%)}
+.cover{border:1px solid rgba(240,34,180,.7);border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.42),0 0 17px rgba(240,34,180,.13)}
+.cover-scan{border-radius:10px}
+.a51-price-box,.side-panel,.panel{background:linear-gradient(155deg,#14111a,#0e1510);border-color:#654267;border-radius:11px}
+.a51-price-value{color:#76ff45;text-shadow:0 0 14px rgba(72,250,22,.2)}
+.btn{border-radius:8px;transition:box-shadow .18s ease,background .18s ease,transform .18s ease}
+.btn-primary{background:#48fa16;border-color:#48fa16;color:#091408}
+.btn-primary:hover{background:#7cff4e;border-color:#7cff4e;box-shadow:0 0 18px rgba(72,250,22,.26)}
+.btn:not(.btn-primary):hover{border-color:#e52bb2;box-shadow:0 0 14px rgba(229,43,178,.15)}
+.btn:focus-visible,.req-toggle button:focus-visible,a:focus-visible{outline:2px solid #8cff5c;outline-offset:3px}
+.req-toggle button{border-radius:6px}
+.req-toggle button.active{border-color:#67ff37;color:#82ff55}
+.tag{border-color:#62465e;border-radius:5px}
+.modal-card{border-color:#a53c8c;background:#101116;border-radius:12px}
+.modal-close{border-radius:6px}
+footer{border-top-color:#355332;color:#a3b5ad}
+@media(max-width:880px){
+ .hero-inner{gap:22px;padding-top:30px}
+ .content-grid{gap:24px;padding-top:30px}
+ .cover-wrap{max-width:230px}
+}
+@media(max-width:560px){
+ .a51-header{padding:15px 14px;gap:8px;flex-wrap:wrap}
+ .a51-brand{font-size:17px}
+ .a51-tag{font-size:9px}
+ .hero-inner{padding:25px 15px}
+ .content-grid{padding:25px 15px 50px}
+ .title-block h1{font-size:clamp(27px,8vw,38px)}
+ .cta-row .btn{min-height:44px;justify-content:center}
+ .side-panel{padding:16px}
+ .cover-wrap{max-width:185px}
+}
+@media(hover:none){.btn:hover{transform:none}}
+@media(prefers-reduced-motion:reduce){.btn{transition:none}}
 </style>
 </head>
 <body>
 <div class="a51-scanbg"></div>
 
 <header class="a51-header">
-  <div class="a51-brand" id="public-brand"><span class="dot"></span> ÁREA&nbsp;51</div>
+  <div class="a51-brand" id="public-brand"><span class="dot"></span> AREA&nbsp;51</div>
   <div class="a51-tag">ARCHIVO&nbsp;·&nbsp;ENTREGA&nbsp;DIRECTA</div>
 </header>
 
@@ -118,7 +184,7 @@
 </div>
 
 <footer>
-  <span id="footer-legal">ÁREA 51 // Ficha de producto</span>
+  <span id="footer-legal">AREA 51 // Ficha de producto</span>
   <span>Enlace de uso privado — no redistribuir públicamente</span>
 </footer>
 
@@ -147,7 +213,7 @@
       return { slug:sellerSlug, name:PUBLIC_SELLER_BRANDS[sellerSlug], isPartner:true };
     }
 
-    return { slug:'area51', name:'ÁREA 51', isPartner:false };
+    return { slug:'area51', name:'AREA 51', isPartner:false };
   }
 
   const PUBLIC_BRAND = getPublicBrand();
