@@ -24,7 +24,7 @@ a{color:inherit;text-decoration:none}button,input,select{font:inherit}button{cur
 </style>
 </head>
 <body>
-<header class="shop-header"><div class="shop-wrap"><div><a href="/" class="shop-logo"><span>●</span> ÁREA 51</a><div class="shop-tagline">👽 TE ABDUCE A LA TECNOLOGÍA</div></div><nav class="shop-nav"><a href="mailto:area51.balcarce@gmail.com?subject=Soporte%20AREA%2051%20-%20Juegos%20PC" class="shop-btn secondary shop-support" style="display:inline-flex;align-items:center;white-space:nowrap" aria-label="Enviar correo a soporte de AREA 51">✉️ SOPORTE</a><a href="/mi-biblioteca/" class="shop-btn secondary" style="display:inline-flex;align-items:center;white-space:nowrap" aria-label="Ir a Mi Biblioteca">🎮 MIS JUEGOS</a><a href="/mis-compras/" class="shop-btn secondary" style="display:inline-flex;align-items:center;white-space:nowrap" aria-label="Ir a Mis Compras">👽 MIS COMPRAS</a><button id="openCart" class="shop-btn" type="button" aria-controls="cartDrawer">🛒 Carrito (<span id="cartCount">0</span>)</button></nav></div></header>
+<header class="shop-header"><div class="shop-wrap"><div><a href="/" class="shop-logo"><span>●</span> ÁREA 51</a><div class="shop-tagline">👽 TE ABDUCE A LA TECNOLOGÍA</div></div><nav class="shop-nav"><a href="mailto:area51.balcarce@gmail.com?subject=Soporte%20AREA%2051%20-%20Juegos%20PC" class="shop-btn secondary shop-support" style="display:inline-flex;align-items:center;white-space:nowrap" aria-label="Enviar correo a soporte de AREA 51">✉️ SOPORTE</a><a href="/mi-biblioteca/" class="shop-btn secondary" style="display:inline-flex;align-items:center;white-space:nowrap" aria-label="Ir a Mi Biblioteca">🎮 MIS JUEGOS</a><a href="/mis-compras/" class="shop-btn secondary" style="display:inline-flex;align-items:center;white-space:nowrap" aria-label="Ir a Mis Compras">👽 MIS COMPRAS</a><button type="button" id="a51OpenRequests" class="shop-btn secondary" style="white-space:nowrap">📩 PEDIDOS</button><button id="openCart" class="shop-btn" type="button" aria-controls="cartDrawer">🛒 Carrito (<span id="cartCount">0</span>)</button></nav></div></header>
 <main>
 <section class="shop-hero"><div class="shop-wrap"><div class="shop-eyebrow">🛸 Biblioteca digital · PC</div><h1>Explorá juegos y software para tu PC</h1><p>Elegí tus favoritos, consultá sus requisitos y armá tu carrito. Los pagos y las descargas estarán disponibles cuando finalicemos la implementación segura de la tienda.</p></div></section>
 <section class="shop-wrap a51-help" id="como-comprar" aria-labelledby="a51-how-title">
@@ -194,5 +194,45 @@ load().then(()=>{loadCloud();
 })();
 </script>
 <script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));}</script>
+
+<style>
+#a51RequestModal[hidden]{display:none!important}#a51RequestModal{position:fixed;inset:0;z-index:100;background:#000c;display:grid;place-items:center;padding:16px}
+#a51RequestPanel{width:min(100%,440px);background:#101918;color:#eaf7f1;border:1px solid #31ef9b;border-radius:15px;padding:25px;box-shadow:0 15px 70px #000b}
+#a51RequestPanel label{display:block;margin:15px 0 6px}#a51RequestPanel input,#a51RequestPanel select{width:100%;padding:12px;background:#07110e;color:white;border:1px solid #476357;border-radius:8px}
+#a51RequestPanel .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}#a51RequestStatus{min-height:24px;font-size:13px;line-height:1.5;color:#a9e6c9}
+@media(max-width:600px){.shop-nav #a51OpenRequests{display:inline-flex;font-size:11px;padding:9px 10px}.shop-nav{flex-wrap:wrap}}
+</style>
+<div id="a51RequestModal" hidden role="dialog" aria-modal="true" aria-labelledby="a51RequestTitle">
+ <section id="a51RequestPanel">
+  <h2 id="a51RequestTitle">📩 PEDIDOS · AREA 51</h2>
+  <p>¿No encontrás un título? Pedilo y te avisamos en la campanita cuando lo publiquemos.</p>
+  <form id="a51RequestForm">
+   <label for="a51RequestKind">Elección</label><select id="a51RequestKind" required><option value="juego">🎮 Juego</option><option value="software">💻 Software</option></select>
+   <label for="a51RequestName">Nombre completo</label><input id="a51RequestName" required minlength="3" maxlength="160" autocomplete="off" placeholder="Escribí el nombre real, sin abreviaturas">
+   <p id="a51RequestStatus" role="status" aria-live="polite"></p>
+   <div class="actions"><button type="button" class="shop-btn secondary" id="a51RequestClose">Cerrar</button><button type="submit" class="shop-btn" id="a51RequestSubmit">Enviar pedido</button></div>
+  </form>
+ </section>
+</div>
+<script>
+(()=>{'use strict';
+const modal=document.getElementById('a51RequestModal'),open=document.getElementById('a51OpenRequests'),close=document.getElementById('a51RequestClose'),form=document.getElementById('a51RequestForm'),status=document.getElementById('a51RequestStatus'),submit=document.getElementById('a51RequestSubmit');
+let lastFocus=null;
+function hide(){modal.hidden=true;document.body.style.overflow='';lastFocus?.focus();}
+open.addEventListener('click',()=>{lastFocus=document.activeElement;modal.hidden=false;document.body.style.overflow='hidden';status.textContent='';document.getElementById('a51RequestKind').focus();});
+close.addEventListener('click',hide);
+modal.addEventListener('click',e=>{if(e.target===modal)hide();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!modal.hidden)hide();});
+form.addEventListener('submit',async e=>{
+ e.preventDefault();submit.disabled=true;status.textContent='Registrando tu pedido...';
+ try{
+  const response=await fetch('/api/mis-compras?action=customer-requests',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({kind:document.getElementById('a51RequestKind').value,name:document.getElementById('a51RequestName').value})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok){if(response.status===401){status.textContent='🔐 Primero iniciá sesión en tu cuenta: ';const a=document.createElement('a');a.href='/acceso/';a.textContent='Ingresar con mi correo';a.style.color='#31ef9b';status.append(a);return;}throw Error(data.error||'No se pudo enviar el pedido.');}
+  status.textContent='✅ '+data.message;form.reset();
+ }catch(error){status.textContent=error.message;}finally{submit.disabled=false;}
+});
+})();
+</script>
 </body>
 </html>
