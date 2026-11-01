@@ -23,6 +23,13 @@ header,main{width:min(1100px,calc(100% - 32px));margin:auto}header{display:flex;
 <section class="card" id="account" hidden><strong>Cuenta autenticada:</strong> <span id="email"></span><div style="margin-top:16px"><button type="button" id="logout">Cerrar sesión</button></div></section>
 <section class="card"><h2>📥 Centro de ayuda para descargas</h2><details><summary>🔗 Descarga directa</summary><p>Abrí el enlace de tu juego y guardá los archivos en tu PC. Si hay varias partes, descargá todas antes de seguir las instrucciones del producto.</p></details><details><summary>🧲 Archivo .torrent</summary><p>Instalá qBittorrent desde el botón oficial de arriba. Descargá el archivo .torrent de tu biblioteca y abrilo con qBittorrent. Elegí una carpeta y esperá que finalice la transferencia.</p></details><details><summary>🛸 Enlace magnet</summary><p>Con qBittorrent instalado, pulsá «Abrir MAGNET» y aceptá abrir el enlace en el programa. Elegí dónde guardar los archivos.</p></details><details><summary>❓ Si la descarga no comienza</summary><p>Revisá tu conexión, el espacio disponible y que qBittorrent esté abierto. La disponibilidad de pares o fuentes externas puede afectar la transferencia. Si el enlace no funciona, contactá a soporte.</p></details><p><a href="mailto:area51.balcarce@gmail.com?subject=Ayuda%20con%20descarga%20PC">✉️ Pedir ayuda a AREA 51</a></p></section>
 <section class="card" id="unauthorized" hidden><h2>Iniciá sesión para ver tus juegos</h2><p>El acceso se realiza mediante el correo autorizado de AREA 51.</p><a href="/test-acceso/">🔑 Ir al acceso privado</a> <a href="/acceso/" style="margin-left:12px">👽 Acceso de clientes</a></section>
+<section class="card" id="a51Notifications" hidden aria-label="Notificaciones de AREA 51">
+<h2>🔔 Notificaciones <span id="a51NotificationCount" aria-live="polite"></span></h2>
+<p id="a51NotificationStatus">Consultando novedades...</p>
+<div id="a51NotificationList"></div>
+<button type="button" id="a51NotificationRefresh">Actualizar notificaciones</button>
+</section>
+<script src="/assets/a51-notifications.js" defer></script>
 <section class="card" id="a51History"><h2>🧾 Historial de compras</h2><p>Consultá tus pedidos y su estado. Solo se muestran operaciones asociadas a tu cuenta.</p><button type="button" id="a51LoadHistory">Ver mis pedidos</button><div id="a51HistoryResult" aria-live="polite"></div></section>
 <p id="message" role="status" aria-live="polite">Consultando tu biblioteca...</p>
 <section class="grid" id="games" aria-label="Juegos de mi biblioteca"></section>
