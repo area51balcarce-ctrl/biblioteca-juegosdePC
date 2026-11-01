@@ -200,6 +200,28 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
  .toolbar select{flex:1 1 130px}
  .main>.panel table{min-width:910px}
 }
+
+/* AREA 51 ADMIN - MENU LATERAL SIEMPRE VISIBLE.
+   Solo CSS. La sesion y Cerrar sesion quedan al pie del viewport. */
+@media(min-width:761px){
+ .layout{align-items:start}
+ .sidebar{
+  position:sticky;
+  top:0;
+  height:100vh;
+  height:100dvh;
+  min-height:0;
+  align-self:start;
+  overflow-y:auto;
+  overscroll-behavior-y:contain;
+  scrollbar-width:thin;
+  scrollbar-color:#47613e transparent;
+ }
+ .sidebar-foot{margin-top:auto;flex-shrink:0;padding-top:14px}
+}
+@media(max-width:760px){
+ .sidebar{position:static;height:auto;min-height:0;overflow:visible}
+}
 </style>
 </head>
 <body>
