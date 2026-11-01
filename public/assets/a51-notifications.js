@@ -3,20 +3,26 @@
 const $=id=>document.getElementById(id);
 const section=$('a51Notifications');
 if(!section)return;
+const header=document.querySelector('header');
+const bell=document.createElement('a');bell.href='#a51Notifications';bell.hidden=true;
+bell.setAttribute('aria-label','Abrir notificaciones de AREA 51');
+bell.style.cssText='border:1px solid #655b98;border-radius:12px;padding:9px 12px;white-space:nowrap';
+bell.textContent='🔔';if(header)header.append(bell);
 const status=$('a51NotificationStatus'),list=$('a51NotificationList'),count=$('a51NotificationCount');
 async function request(options){
  const response=await fetch('/api/mis-compras?action=customer-notifications',{
   credentials:'same-origin',cache:'no-store',
   headers:{Accept:'application/json','Content-Type':'application/json'},...options
  });
- if(response.status===401){section.hidden=true;return null;}
+ if(response.status===401){section.hidden=true;bell.hidden=true;return null;}
  const data=await response.json().catch(()=>({}));
  if(!response.ok)throw Error(data.error||'No se pudo consultar el servidor');
  return data;
 }
 function render(data){
  if(!data)return;
- section.hidden=false;
+ section.hidden=false;bell.hidden=false;
+ bell.textContent=data.unread?'🔔 '+data.unread:'🔔';
  count.textContent=data.unread?'('+data.unread+' sin leer)':'(al día)';
  list.replaceChildren();
  if(!data.notifications?.length){status.textContent='Todavía no tenés notificaciones.';return;}
@@ -49,4 +55,5 @@ $('a51NotificationRefresh').addEventListener('click',load);
 load();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)load();});
 window.addEventListener('a51-customer-session-changed',load);
+setInterval(()=>{if(!document.hidden)load();},120000);
 })();
