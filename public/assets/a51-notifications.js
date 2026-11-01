@@ -48,4 +48,5 @@ async function load(){
 $('a51NotificationRefresh').addEventListener('click',load);
 load();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)load();});
+window.addEventListener('a51-customer-session-changed',load);
 })();
