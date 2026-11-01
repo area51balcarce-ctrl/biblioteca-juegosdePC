@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>Catálogo — Panel ÁREA 51</title>
+<title>Catálogo — Panel AREA 51</title>
 <link rel="stylesheet" href="../assets/style.css">
 <style>
   .layout{ display:grid; grid-template-columns:220px 1fr; min-height:100vh; }
@@ -120,13 +120,44 @@
   body.operator-mode table thead th:nth-child(2),body.operator-mode table tbody td:nth-child(2){text-align:right;}
   body.operator-mode .operator-copy-wrap{display:flex;justify-content:flex-end;}
   @media(max-width:760px){body.operator-mode .layout{grid-template-columns:1fr;}body.operator-mode .sidebar{border-right:0;border-bottom:1px solid var(--line);padding:14px 18px;flex-direction:row;align-items:center;gap:12px;}body.operator-mode .sidebar .a51-brand{margin:0 auto 0 0;}body.operator-mode .sidebar .nav-item{display:none!important;}body.operator-mode .sidebar-foot{margin:0;display:flex;align-items:center;gap:10px;padding:0;}body.operator-mode .sidebar-foot button{margin:0;width:auto;}body.operator-mode .main{padding-top:22px;}}
+
+/* AREA 51 ADMIN - IDENTIDAD VISUAL 2026. Solo CSS; conserva toda la logica. */
+:root{--bg:#050608;--bg-elev:#0e1014;--bg-panel:#14121a;--bg-panel-2:#18151d;--line:#354b34;--line-bright:#4a6840;--text:#f2fff0;--text-dim:#b0c6b3;--text-faint:#8d9f92;--accent:#6cff36;--accent-soft:rgba(108,255,54,.12);--accent-dim:#3a8e26;--radius:9px}
+body{background:#050608}
+.a51-scanbg{background:radial-gradient(ellipse at 10% 0%,rgba(72,250,22,.10),transparent 42%),radial-gradient(ellipse at 95% 80%,rgba(229,10,168,.10),transparent 48%),radial-gradient(circle at 14% 25%,rgba(255,255,255,.18) 0 1px,transparent 1.5px),#050608;background-size:auto,auto,283px 289px,auto}
+.sidebar{background:linear-gradient(180deg,rgba(15,17,19,.98),rgba(14,10,19,.97));border-right:1px solid #66305d;box-shadow:3px 0 18px rgba(229,10,168,.06)}
+.sidebar .a51-brand{color:#f4fff1;font-family:var(--f-body);font-weight:900;letter-spacing:.06em}
+.sidebar .a51-brand .dot{background:#48fa16;box-shadow:0 0 12px rgba(72,250,22,.8)}
+.nav-item{border-radius:7px;border-left:2px solid transparent;transition:background .18s ease,border-color .18s ease}
+.nav-item:hover{background:rgba(229,10,168,.09);color:#fff}
+.nav-item.active{border-left-color:#67ff37;color:#9bff7a;background:rgba(72,250,22,.11);box-shadow:inset 0 0 12px rgba(72,250,22,.04)}
+.sidebar-foot button{border-color:#814374;border-radius:8px;color:#f3d7eb;min-height:40px}
+.sidebar-foot button:hover{border-color:#f022b4;color:#ff9cde}
+.main{background:transparent}
+.topbar h1{color:#f6fff4;text-shadow:0 0 18px rgba(72,250,22,.1)}
+.panel{background:linear-gradient(155deg,#15111b,#0d1510);border:1px solid #634263;border-radius:11px;box-shadow:0 4px 20px rgba(0,0,0,.16)}
+.stat{border-color:#59435b}
+.stat .n{color:#80ff50}
+.btn{border-radius:8px;min-height:40px}
+.btn-primary{background:#48fa16;border-color:#48fa16;color:#091408}
+.btn-primary:hover{background:#7cff4e;border-color:#7cff4e;box-shadow:0 0 17px rgba(72,250,22,.22)}
+.btn:not(.btn-primary):hover{border-color:#e52bb2;box-shadow:0 0 13px rgba(229,43,178,.12)}
+input,select,textarea{background:#101318;color:#f3fff1;border-color:#49653e;border-radius:8px}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid #8bff61;outline-offset:2px}
+table{background:transparent}
+thead{background:rgba(72,250,22,.055)}
+tbody tr:hover{background:rgba(229,10,168,.045)}
+.health-btn{border-radius:6px}
+.verify-progress{border-color:#73516f;border-radius:10px}
+@media(max-width:760px){.sidebar{border-right:0;border-bottom:1px solid #66305d}.main{padding-left:15px;padding-right:15px}}
+@media(prefers-reduced-motion:reduce){.nav-item{transition:none}}
 </style>
 </head>
 <body>
 <div class="a51-scanbg"></div>
 <div class="layout">
   <nav class="sidebar">
-    <div class="a51-brand"><span class="dot"></span> ÁREA&nbsp;51</div>
+    <div class="a51-brand"><span class="dot"></span> AREA&nbsp;51</div>
     <div class="nav-item active">📂 Catálogo</div>
     <div class="nav-item" title="Próximamente">🏷️ Categorías &amp; etiquetas</div>
     <a class="nav-item" href="/admin/precios.html" style="display:block;text-decoration:none;">💰 Precios por categoría</a>
