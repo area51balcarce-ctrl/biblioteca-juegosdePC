@@ -57,6 +57,17 @@ footer{border-top-color:#365b2e;color:#9caf9c}
  .state{padding:8px}
 }
 @media(hover:none){.game:hover{transform:none}}
+
+/* AREA 51 - ETAPA 4: detalles premium de Mi Biblioteca. Solo CSS. */
+@keyframes a51-library-pulse{0%,100%{opacity:.65}50%{opacity:1}}
+.game:hover .art img{filter:brightness(1.05) saturate(1.07)}
+.art img{transition:filter .25s ease}
+.card:focus-within{border-color:#8b4b82}
+button:active:not(:disabled){filter:brightness(.94)}
+.pill{box-shadow:inset 0 0 12px rgba(72,250,22,.06)}
+#message:not(:empty){border-left:2px solid #58ff2e;padding-left:12px}
+@media(hover:none){.game:hover .art img{filter:none}}
+@media(prefers-reduced-motion:reduce){.art img{transition:none}}
 </style>
 </head>
 <body>
