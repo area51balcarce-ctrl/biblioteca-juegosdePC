@@ -262,7 +262,33 @@ async function a51_discoverPreview(req,res){
   }catch(e){return res.status(502).json({error:e.name==='AbortError'?'El catálogo agotó el tiempo de espera':'No se pudo leer el catálogo externo'})}
 }
 
+
+async function a51_discoverBatch(req,res){
+ res.setHeader('Cache-Control','no-store');
+ if(req.method!=='GET')return res.status(405).json({error:'Método no permitido'});
+ try{
+  const page=Number(req.query.page||1),limit=Number(req.query.limit||5);
+  if(!Number.isSafeInteger(page)||page<1||page>1000||![5,10,25].includes(limit))return res.status(400).json({error:'Parámetros inválidos'});
+  const source=new URL('https://www.gamestorrents.app/juegos-pc/');
+  if(page>1)source.searchParams.set('page',String(page));
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),9000);
+  let response;
+  try{response=await fetch(source.href,{signal:controller.signal,redirect:'error',headers:{Accept:'text/html','User-Agent':'AREA51-MetadataPreview/1.0'}})}finally{clearTimeout(timer)}
+  if(!response.ok)return res.status(502).json({error:'Catálogo: HTTP '+response.status});
+  if(!(response.headers.get('content-type')||'').includes('text/html'))return res.status(422).json({error:'Respuesta no HTML'});
+  const reader=response.body.getReader(),chunks=[];let size=0;
+  while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>1500000){await reader.cancel();return res.status(413).json({error:'Respuesta demasiado grande'})}chunks.push(Buffer.from(value))}
+  const html=Buffer.concat(chunks).toString('utf8'),links=new Set();
+  for(const match of html.matchAll(/href\s*=\s*["']([^"'<>]+)["']/gi)){
+   try{const u=new URL(match[1].replace(/&amp;/g,'&'),source);if(u.protocol==='https:'&&u.hostname==='www.gamestorrents.app'&&/^\/juegos-pc\/[a-z0-9-]+\/?$/.test(u.pathname)){u.search='';u.hash='';u.pathname=u.pathname.replace(/\/?$/,'/');links.add(u.href)}}catch{}
+   if(links.size>=200)break;
+  }
+  return res.status(200).json({urls:[...links].slice(0,limit),found:links.size,page,limit,source:source.href});
+ }catch(e){return res.status(502).json({error:e.name==='AbortError'?'Tiempo de espera agotado':'No se pudo consultar el catálogo'})}
+}
+
 module.exports = async function handler(req, res){
+  if(req.query?.mode === 'import-discover-batch') return a51_discoverBatch(req,res);
   if(req.query?.mode === 'import-discover') return a51_discoverPreview(req,res);
   if(req.query?.mode === 'import-preview') return a51_importPreview(req,res);
   if(req.method !== 'GET') return send(res,405,{error:'Método no permitido'});
