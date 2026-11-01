@@ -1,5 +1,6 @@
 // AREA 51 — API unificada MIS COMPRAS para Vercel Hobby.
 // Sesión, cierre y lectura de productos adquiridos. Sin pagos ni descargas.
+import customerRequests from '../lib/pc/customer-requests.js';
 import customerLibraryHandler from '../lib/pc/customer-library-handler.js';
 import { readSession, clearSessionCookie, sameOrigin } from './_lib/a51-session.js';
 import customerAuthHandler from '../lib/pc/customer-auth-handler.js';
@@ -31,6 +32,7 @@ export default async function handler(req, res) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   const action = typeof req.query?.action === 'string' ? req.query.action : '';
 
+  if (action === 'customer-requests') return customerRequests(req,res);
   if (action === 'admin-clients') return adminClients(req,res);
   if (action === 'customer-preferences') return customerPreferences(req,res);
   if (action === 'customer-order-history') return customerOrderHistory(req,res);
