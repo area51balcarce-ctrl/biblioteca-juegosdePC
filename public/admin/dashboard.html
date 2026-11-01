@@ -151,6 +151,55 @@ tbody tr:hover{background:rgba(229,10,168,.045)}
 .verify-progress{border-color:#73516f;border-radius:10px}
 @media(max-width:760px){.sidebar{border-right:0;border-bottom:1px solid #66305d}.main{padding-left:15px;padding-right:15px}}
 @media(prefers-reduced-motion:reduce){.nav-item{transition:none}}
+
+/* AREA 51 ADMIN - AJUSTE DE ENCUADRE RESPONSIVE.
+   Evita el desplazamiento horizontal de toda la pagina; conserva las 8 columnas
+   y todas las acciones. En pantallas angostas desplaza solo la tabla. */
+html,body{width:100%;max-width:100%;overflow-x:hidden}
+.layout{grid-template-columns:clamp(178px,17vw,220px) minmax(0,1fr);width:100%;max-width:100%;min-width:0}
+.sidebar{min-width:0}
+.main{min-width:0;width:100%;max-width:100%;padding:24px clamp(12px,1.8vw,28px) 48px}
+.main>.panel{max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;scrollbar-color:#538947 #111319}
+.main>.panel table{width:100%;min-width:910px;table-layout:auto}
+.main>.panel thead th{padding:10px 7px;font-size:9.5px;letter-spacing:.025em}
+.main>.panel tbody td{padding:10px 7px;font-size:12px}
+.main>.panel .game-cell{gap:7px;min-width:130px}
+.main>.panel .game-thumb{width:30px;height:30px}
+.main>.panel .game-name{font-size:12px;overflow-wrap:anywhere}
+.main>.panel .game-slug,.main>.panel .uuid-short{font-size:9px;overflow-wrap:anywhere}
+.main>.panel .api-actions{min-width:145px;gap:4px}
+.main>.panel .copy-btn{font-size:9px;padding:5px 7px;letter-spacing:0}
+.main>.panel .download-summary{min-width:145px}
+.main>.panel .health-counts{gap:4px}
+.main>.panel .health-pill{font-size:9px;padding:3px 5px}
+.main>.panel .health-btn{font-size:9px;padding:5px 6px}
+.main>.panel .row-actions{gap:4px}
+.main>.panel .download-item{min-width:0}
+.stat-row{gap:10px;margin-bottom:20px}
+.stat{padding:13px 14px;min-width:0}
+.stat .n{font-size:23px}
+.stat .l{font-size:9px;letter-spacing:.04em}
+.toolbar{gap:8px}
+.toolbar .search-box{min-width:180px}
+.toolbar select{min-width:0;max-width:100%;font-size:10.5px;padding:10px 7px}
+@media(max-width:1100px){
+ .layout{grid-template-columns:180px minmax(0,1fr)}
+ .sidebar{padding:20px 12px}
+ .sidebar .nav-item{font-size:11px;padding:9px 7px}
+ .main{padding:20px 12px 40px}
+ .topbar{margin-bottom:18px}
+}
+@media(max-width:760px){
+ .layout{display:block}
+ .sidebar{border-right:0;border-bottom:1px solid #66305d;min-height:0;padding:12px;gap:4px}
+ .sidebar .a51-brand{margin-bottom:8px}
+ .sidebar-foot{margin-top:10px}
+ .main{padding:18px 10px 35px}
+ .stat-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .toolbar .search-box{flex:1 1 100%}
+ .toolbar select{flex:1 1 130px}
+ .main>.panel table{min-width:910px}
+}
 </style>
 </head>
 <body>
