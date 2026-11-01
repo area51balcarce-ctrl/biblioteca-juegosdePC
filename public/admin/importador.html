@@ -1,11 +1,29 @@
 <!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Importador web — AREA 51</title><link rel="stylesheet" href="../assets/style.css"><style>
 body{background:#0b0d0d;color:#eee;font-family:system-ui,sans-serif}main{max-width:1100px;margin:30px auto;padding:20px}a{color:#a8ff37}.panel{border:1px solid #334031;background:#111713;padding:22px;margin:16px 0;border-radius:10px}textarea{width:100%;min-height:130px;background:#090d0b;color:#fff;border:1px solid #52604d;padding:12px;box-sizing:border-box}button{background:#adff38;color:#081000;border:0;padding:12px 18px;font-weight:700;cursor:pointer;border-radius:5px}button:disabled{opacity:.5;cursor:wait}.muted{color:#a5b2a5}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #344034;text-align:left;padding:10px;vertical-align:top}img{max-height:80px;max-width:65px}code{overflow-wrap:anywhere}#status{white-space:pre-wrap}.warn{color:#ffca72}
-</style></head><body><main><p><a href="/admin/dashboard">← Volver al catálogo</a></p><h1>🌐 Importador web — Laboratorio</h1><p class="muted">Prueba limitada a 5 fichas. Solo lectura de metadatos públicos; no guarda, no publica y no importa enlaces Torrent/Magnet. Revisá los derechos de reutilización antes de publicar contenidos.</p><section class="panel"><label for="urls">URLs de fichas individuales de GamesTorrents (máximo 5, una por línea)</label><textarea id="urls" spellcheck="false" placeholder="https://www.gamestorrents.app/juegos-pc/keep-driving/"></textarea><p><button id="analyze" type="button">🔍 Analizar 5 fichas</button></p><p id="status" aria-live="polite" class="muted"></p></section><section class="panel"><h2>Vista previa (sin guardar)</h2><div style="overflow-x:auto"><table><thead><tr><th>Portada</th><th>Juego</th><th>Géneros</th><th>Descripción / observaciones</th><th>Origen</th></tr></thead><tbody id="results"><tr><td colspan="5" class="muted">Todavía no hay resultados.</td></tr></tbody></table></div></section></main>
+</style></head><body><main><p><a href="/admin/dashboard">← Volver al catálogo</a></p><h1>🌐 Importador web — Laboratorio</h1><p class="muted">Prueba limitada a 5 fichas. Solo lectura de metadatos públicos; no guarda, no publica y no importa enlaces Torrent/Magnet. Revisá los derechos de reutilización antes de publicar contenidos.</p><section class="panel"><label for="urls">URLs de fichas individuales de GamesTorrents (máximo 5, una por línea)</label><textarea id="urls" spellcheck="false" placeholder="https://www.gamestorrents.app/juegos-pc/keep-driving/"></textarea><p><button id="discover" type="button">🌐 Explorar catálogo (5 fichas)</button> <button id="analyze" type="button">🔍 Analizar 5 fichas</button></p><p class="muted">La exploración descubre URLs públicas. No guarda productos ni modifica fichas existentes.</p><p id="status" aria-live="polite" class="muted"></p></section><section class="panel"><h2>Vista previa (sin guardar)</h2><div style="overflow-x:auto"><table><thead><tr><th>Portada</th><th>Juego</th><th>Géneros</th><th>Descripción / observaciones</th><th>Origen</th></tr></thead><tbody id="results"><tr><td colspan="5" class="muted">Todavía no hay resultados.</td></tr></tbody></table></div></section></main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script><script src="../assets/config.js"></script><script src="../assets/store.js"></script><script>
 (async()=>{const session=await a51_requireSession();if(!session)return;
 const btn=document.getElementById('analyze'),status=document.getElementById('status'),tbody=document.getElementById('results');
 const cell=(row,text)=>{const td=document.createElement('td');td.textContent=text||'—';row.append(td);return td;};
+const discover=document.getElementById('discover');
+discover.addEventListener('click',async()=>{
+  discover.disabled=true;btn.disabled=true;status.textContent='Buscando fichas en el catálogo público…';
+  try{
+    const response=await fetch('/api/igdb-data-v2?mode=import-discover&page=1');
+    const data=await response.json();
+    if(!response.ok)throw Error(data.error||'No se pudo explorar el catálogo');
+    const existing=await a51_getProducts();
+    const slugs=new Set(existing.map(p=>a51_slugify(p.slug||p.name||'')));
+    const candidates=(data.urls||[]).filter(url=>{
+      const slug=new URL(url).pathname.split('/').filter(Boolean).pop();
+      return !slugs.has(a51_slugify(slug));
+    });
+    document.getElementById('urls').value=candidates.join('\\n');
+    status.textContent='Encontradas '+data.found+' URLs en la página consultada. '+candidates.length+' candidatas nuevas cargadas para revisión. '+(data.urls.length-candidates.length)+' coincidencias descartadas. Ningún producto fue guardado.';
+  }catch(e){status.textContent='Exploración no completada: '+e.message;}
+  finally{discover.disabled=false;btn.disabled=false;}
+});
 btn.addEventListener('click',async()=>{const urls=[...new Set(document.getElementById('urls').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean))];if(!urls.length||urls.length>5){status.textContent='Ingresá entre 1 y 5 URLs.';return;}btn.disabled=true;tbody.replaceChildren();let done=0;
 for(const url of urls){const tr=document.createElement('tr');tbody.append(tr);try{const u=new URL(url);if(u.protocol!=='https:'||u.hostname!=='www.gamestorrents.app'||!/^\/juegos-pc\/[a-z0-9-]+\/$/.test(u.pathname))throw Error('URL de ficha no válida');
 const response=await fetch('/api/igdb-data-v2?mode=import-preview&url='+encodeURIComponent(u.href));const data=await response.json();if(!response.ok)throw Error(data.error||'Error de lectura');
