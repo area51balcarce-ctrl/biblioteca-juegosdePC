@@ -222,6 +222,40 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
 @media(max-width:760px){
  .sidebar{position:static;height:auto;min-height:0;overflow:visible}
 }
+
+/* AREA 51 ADMIN - SCROLL INDEPENDIENTE POR SECTORES.
+   Desktop: pagina fija, izquierda fija, solo contenido derecho desplazable.
+   Mobile: conserva scroll natural y diseno responsive existente. */
+@media(min-width:761px){
+ html,body{height:100%;overflow:hidden}
+ .layout{
+  height:100vh;
+  height:100dvh;
+  min-height:0;
+  max-height:100dvh;
+  overflow:hidden;
+  align-items:stretch;
+ }
+ .sidebar{
+  position:relative;
+  top:auto;
+  height:100%;
+  min-height:0;
+  max-height:100%;
+  overflow-y:auto;
+  overscroll-behavior-y:contain;
+ }
+ .main{
+  height:100%;
+  min-height:0;
+  max-height:100%;
+  overflow-y:auto;
+  overflow-x:hidden;
+  overscroll-behavior-y:contain;
+  scrollbar-width:thin;
+  scrollbar-color:#538947 #101216;
+ }
+}
 </style>
 </head>
 <body>
