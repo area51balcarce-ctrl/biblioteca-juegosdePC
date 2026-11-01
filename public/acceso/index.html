@@ -33,6 +33,16 @@ button.secondary{background:#241428;color:#ffe5f8;border-color:#b73594}
 a{color:#81ff54}
 small{color:#aabda9}
 @media(max-width:600px){main{padding:21px;border-radius:15px}}
+
+/* AREA 51 - ETAPA 3: formulario adaptado a PWA y pantallas pequenas. Solo CSS. */
+@media(max-width:600px){
+ body{padding:14px;min-height:100dvh}
+ main{width:100%;padding:22px}
+ h1{font-size:clamp(1.3rem,6vw,1.55rem)}
+ input{min-height:48px;font-size:16px}
+ button{min-height:46px;max-width:100%}
+}
+@media(max-width:360px){body{padding:9px}main{padding:17px}}
 </style>
 </head>
 <body>
