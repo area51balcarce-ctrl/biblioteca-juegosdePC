@@ -46,12 +46,12 @@ async function api(action,options={},params={}){
  if(!response.ok){const error=new Error(data.error||'No se pudo consultar el servidor.');error.status=response.status;throw error;}
  return data;
 }
-function showUnauthorized(message){$('account').hidden=true;$('unauthorized').hidden=false;$('games').replaceChildren();$('message').textContent=message||'Ingresá para consultar tu biblioteca.';}
+function showUnauthorized(message){window.dispatchEvent(new Event('a51-customer-session-changed'));$('account').hidden=true;$('unauthorized').hidden=false;$('games').replaceChildren();$('message').textContent=message||'Ingresá para consultar tu biblioteca.';}
 async function load(){
  try{
   const data=await api('customer-library');
   if(!Array.isArray(data.products)||data.downloadsEnabled!==false||data.testMode!==true)throw new Error('Respuesta inesperada del servidor.');
-  $('email').textContent=data.email||'';$('account').hidden=false;$('unauthorized').hidden=true;
+  $('email').textContent=data.email||'';$('account').hidden=false;$('unauthorized').hidden=true;window.dispatchEvent(new Event('a51-customer-session-changed'));
   const games=$('games');games.replaceChildren();
   if(!data.products.length){$('message').textContent='Todavía no hay juegos registrados en tu biblioteca.';return;}
   $('message').textContent=data.products.length+' juego(s) en tu biblioteca.';
