@@ -74,7 +74,7 @@ async function inspectLink(raw){
   try{
     let response = await timedFetch(url.toString(), { method:'HEAD' });
 
-    if([405, 501].includes(response.status)){
+    if([405, 501, 404, 410].includes(response.status)){
       response = await timedFetch(url.toString(), {
         method:'GET',
         headers:{ Range:'bytes=0-0' }
@@ -116,7 +116,7 @@ async function getBatch(){
   const baseUrl = process.env.SUPABASE_URL;
   const query = new URL(`${baseUrl}/rest/v1/product_downloads`);
 
-  query.searchParams.set('select', 'id,product_id,url,status,health_status,checked_at');
+  query.searchParams.set('select', 'id,product_id,url,status,health_status,checked_at,consecutive_confirmed_down');
   query.searchParams.set('status', 'neq.disabled');
   query.searchParams.set('url', 'not.is.null');
   query.searchParams.set('order', 'checked_at.asc.nullsfirst,id.asc');
@@ -133,30 +133,60 @@ async function getBatch(){
   return response.json();
 }
 
-async function saveResult(downloadId, result, checkedAt){
+/* Solo el cron puede eliminar: dos respuestas 404/410 confirmadas en
+   revisiones de dias UTC distintos. Los errores temporales nunca eliminan. */
+async function saveResult(item, result, checkedAt){
   const baseUrl = process.env.SUPABASE_URL;
+  const priorCount = Number(item.consecutive_confirmed_down || 0);
+  const wasDown = item.health_status === 'down';
+  const previousDay = item.checked_at
+    ? String(item.checked_at).slice(0,10)
+    : null;
+  const today = checkedAt.slice(0,10);
+  const newDay = previousDay !== today;
+  const confirmedDown = result.healthStatus === 'down' &&
+    [404,410].includes(result.httpStatus);
+  const consecutive = confirmedDown
+    ? (wasDown && priorCount > 0
+        ? priorCount + (newDay ? 1 : 0)
+        : 1)
+    : 0;
+
   const query = new URL(`${baseUrl}/rest/v1/product_downloads`);
-  query.searchParams.set('id', `eq.${downloadId}`);
+  query.searchParams.set('id', `eq.${item.id}`);
+  query.searchParams.set('url', `eq.${item.url}`);
+
+  if(confirmedDown && wasDown && priorCount >= 1 && newDay){
+    // Eliminacion definitiva SOLO del enlace, nunca del producto.
+    const response = await fetch(query, {
+      method:'DELETE',
+      headers:{...supabaseHeaders(), Prefer:'return=representation'}
+    });
+    if(!response.ok) throw new Error(`Supabase eliminacion: ${response.status} ${await response.text()}`);
+    const removed = await response.json();
+    if(!Array.isArray(removed) || removed.length !== 1){
+      throw new Error('El enlace cambio o ya no existe; no se elimino.');
+    }
+    return { deleted:true, consecutive };
+  }
 
   const response = await fetch(query, {
     method:'PATCH',
-    headers:{
-      ...supabaseHeaders(),
-      Prefer:'return=minimal'
-    },
+    headers:{...supabaseHeaders(), Prefer:'return=representation'},
     body:JSON.stringify({
       health_status:result.healthStatus,
-      checked_at:checkedAt
+      checked_at:checkedAt,
+      consecutive_confirmed_down:consecutive
     })
   });
-
-  if(!response.ok){
-    throw new Error(`Supabase guardado: ${response.status} ${await response.text()}`);
-  }
+  if(!response.ok) throw new Error(`Supabase guardado: ${response.status} ${await response.text()}`);
+  const saved = await response.json();
+  if(!Array.isArray(saved) || saved.length !== 1) throw new Error('El enlace cambio durante la revision.');
+  return { deleted:false, consecutive };
 }
 
 async function processBatch(items){
-  const totals = { active:0, review:0, down:0, errors:0 };
+  const totals = { active:0, review:0, down:0, deleted:0, errors:0 };
   const details = [];
   let cursor = 0;
 
@@ -170,15 +200,17 @@ async function processBatch(items){
 
       try{
         const result = await inspectLink(item.url);
-        await saveResult(item.id, result, checkedAt);
+        const saved = await saveResult(item, result, checkedAt);
 
         totals[result.healthStatus] = (totals[result.healthStatus] || 0) + 1;
+        if(saved.deleted) totals.deleted++;
         details.push({
           id:item.id,
           productId:item.product_id,
           status:result.healthStatus,
           httpStatus:result.httpStatus,
-          reason:result.reason
+          reason:result.reason,
+          deleted:saved.deleted
         });
       }catch(error){
         totals.errors++;
