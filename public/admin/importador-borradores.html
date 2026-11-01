@@ -1,0 +1,35 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Revisión de borradores AREA 51</title><link rel="stylesheet" href="../assets/style.css"><style>
+body{background:#0b0d0d;color:#eee;font-family:system-ui,sans-serif}main{max-width:1100px;margin:30px auto;padding:20px}a{color:#adff38}.panel{border:1px solid #354332;background:#111713;border-radius:9px;padding:20px;margin:16px 0}button{background:#adff38;color:#071000;border:0;padding:11px 16px;font-weight:700;border-radius:5px;cursor:pointer}button:disabled{opacity:.5;cursor:wait}input,select,textarea{background:#080e0b;color:white;border:1px solid #51614c;padding:10px;box-sizing:border-box}input[type=text],textarea{width:100%}textarea{min-height:90px}label{display:block;margin:10px 0}.muted{color:#b3bdb2}.item{border-top:1px solid #384638;padding:15px 0}.status{white-space:pre-wrap}small{color:#acb6a9}
+</style></head><body><main><p><a href="/admin/importador-lotes.html">← Volver a exploración</a></p><h1>📦 Revisión de 5 borradores</h1><p class="muted">Solo se importan nombres para revisión. Completá una descripción propia o autorizada y seleccioná la base legal real. No se importan portadas, enlaces ni textos de GamesTorrents. El estado se fija en borrador y nunca se publica automáticamente.</p><section class="panel"><div id="items"></div><p><button id="save" disabled>💾 Guardar seleccionados como borradores</button></p><p id="status" class="status muted" aria-live="polite"></p></section></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script><script src="../assets/config.js"></script><script src="../assets/store.js"></script><script>
+(async()=>{if(!await a51_requireSession())return;
+const $=id=>document.getElementById(id),root=$('items'),status=$('status'),save=$('save');
+let rows=[];try{const raw=JSON.parse(sessionStorage.getItem('a51_import_draft_candidates_v1')||'[]');if(!Array.isArray(raw))throw Error();rows=raw.slice(0,5).filter(x=>x&&typeof x.name==='string'&&x.name.trim()).map(x=>({name:x.name.trim().slice(0,180),source:x.source||'',igdb:x.igdb||''}));}catch{}
+if(!rows.length){status.textContent='No hay fichas preparadas. Volvé al explorador y analizá un lote.';return;}
+const choices=[['','Seleccionar base legal comprobada'],['freeware','Freeware'],['shareware','Shareware'],['dominio-publico','Dominio público / licencia libre'],['reventa','Licencia de reventa'],['propio','Contenido propio']];
+for(const [i,item] of rows.entries()){
+ const section=document.createElement('div');section.className='item';const title=document.createElement('h3');title.textContent=(i+1)+'. '+item.name;section.append(title);
+ const label=(text,element)=>{const l=document.createElement('label');l.textContent=text;l.append(element);section.append(l);return element};
+ const check=document.createElement('input');check.type='checkbox';check.checked=true;label(' Seleccionar para borrador ',check);
+ const name=document.createElement('input');name.type='text';name.value=item.name;name.maxLength=180;label('Nombre',name);
+ const description=document.createElement('textarea');description.placeholder='Redactá una descripción propia o pegá una autorizada (opcional)';label('Descripción',description);
+ const legal=document.createElement('select');for(const [value,text] of choices){const o=document.createElement('option');o.value=value;o.textContent=text;legal.append(o)}label('Base legal de distribución',legal);
+ const note=document.createElement('small');note.textContent='Origen consultado: '+item.source+' | IGDB: '+item.igdb;section.append(note);
+ const result=document.createElement('p');result.className='muted';section.append(result);root.append(section);item.controls={check,name,description,legal,result};
+}
+save.disabled=false;
+save.addEventListener('click',async()=>{const selected=rows.filter(x=>x.controls.check.checked);if(!selected.length){status.textContent='Seleccioná al menos una ficha.';return;}
+if(selected.some(x=>!x.controls.name.value.trim()||!x.controls.legal.value)){status.textContent='Completá nombre y base legal de cada ficha seleccionada.';return;}
+const names=selected.map(x=>x.controls.name.value.trim());const slugs=names.map(a51_slugify);if(new Set(slugs).size!==slugs.length){status.textContent='Hay nombres duplicados dentro de la selección.';return;}
+if(!confirm('Se crearán '+selected.length+' borradores privados SIN enlaces ni portadas. ¿Confirmás?'))return;
+save.disabled=true;let success=0,failed=0;
+for(const item of selected){const c=item.controls;try{
+ const slug=a51_slugify(c.name.value);const {data:existing,error:checkError}=await A51_CLIENT.from('products').select('id').eq('slug',slug).limit(1);if(checkError)throw checkError;if(existing.length){c.result.textContent='Omitido: ya existe en el catálogo.';failed++;continue;}
+ const result=await a51_upsertProduct({name:c.name.value.trim(),slug,description:c.description.value.trim(),category:'Juego de PC',tags:'',legalBasis:c.legal.value,status:'draft',downloads:[]});
+ if(!result.ok)throw result.error||Error('No se pudo guardar');c.result.textContent='✓ Borrador creado correctamente';c.check.checked=false;c.check.disabled=true;success++;
+}catch(e){c.result.textContent='Error: '+(e.message||'No se pudo guardar');failed++;}
+status.textContent='Creados: '+success+'. Omitidos o fallidos: '+failed+'. Ningún producto publicado.';}
+save.disabled=false;
+});
+})();
+</script></body></html>
