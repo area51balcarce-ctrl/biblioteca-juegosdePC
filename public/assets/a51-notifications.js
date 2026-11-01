@@ -48,6 +48,7 @@ function render(data){
  }
 }
 async function load(){
+ if(!document.getElementById('account') || document.getElementById('account').hidden){section.hidden=true;bell.hidden=true;return;}
  try{const data=await request();render(data);}
  catch(e){status.textContent='No se pudieron cargar las notificaciones: '+e.message;}
 }
