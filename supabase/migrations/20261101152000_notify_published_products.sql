@@ -6,8 +6,8 @@ language plpgsql
 set search_path = public
 as $$
 begin
-  if new.status = 'ok'
-     and (tg_op = 'INSERT' or old.status is distinct from 'ok') then
+  if new.status = 'ok' and
+     (case when tg_op = 'INSERT' then true else old.status is distinct from 'ok' end) then
     insert into public.pc_customer_notifications
       (kind, title, message, product_id, source_event_id)
     values
