@@ -115,6 +115,41 @@ body{
   .shop-card,.shop-btn{transition:none}
   .shop-card:hover,.shop-btn:hover:not(:disabled){transform:none}
 }
+
+/* AREA 51 - ETAPA 3: ajustes visuales PWA y pantallas tactiles. Solo CSS. */
+@media(max-width:900px){
+ .shop-header .shop-wrap{align-items:center;flex-wrap:wrap;padding-top:11px;padding-bottom:11px}
+ .shop-nav{flex-wrap:wrap;justify-content:flex-start;width:100%;gap:7px}
+ .shop-nav .shop-btn{min-height:42px;display:inline-flex;align-items:center;justify-content:center}
+ .shop-hero{padding-top:34px;padding-bottom:23px}
+ .shop-hero h1{font-size:clamp(29px,5.5vw,44px)}
+ .shop-controls{gap:9px}
+ .shop-controls input{flex-basis:100%}
+}
+@media(max-width:600px){
+ .shop-header .shop-wrap{padding-top:9px;padding-bottom:9px}
+ .shop-logo{font-size:19px}
+ .shop-tagline{font-size:9px}
+ .shop-nav{gap:6px}
+ .shop-nav .shop-btn{font-size:11px;padding:9px 10px;min-height:42px;white-space:nowrap}
+ .shop-nav a.shop-btn{display:inline-flex!important}
+ .shop-hero h1{font-size:clamp(28px,8vw,38px)}
+ .shop-controls input,.shop-controls select{width:100%;min-width:0}
+ .shop-controls select{flex:1 1 140px}
+ .shop-grid{gap:11px}
+ .shop-card-actions .shop-btn{min-height:40px}
+ .shop-drawer{width:min(440px,100vw)}
+ .shop-drawer-content{overscroll-behavior:contain}
+}
+@media(max-width:360px){
+ .shop-nav .shop-btn{font-size:10px;padding:8px}
+ .shop-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .shop-card-body{padding:9px}
+}
+@media(hover:none){
+ .shop-card:hover{transform:none}
+ .shop-btn:hover:not(:disabled){transform:none}
+}
 </style>
 </head>
 <body>
