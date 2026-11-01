@@ -19,7 +19,7 @@ discover.addEventListener('click',async()=>{
       const slug=new URL(url).pathname.split('/').filter(Boolean).pop();
       return !slugs.has(a51_slugify(slug));
     });
-    document.getElementById('urls').value=candidates.join('\\n');
+    document.getElementById('urls').value=candidates.join('\n');
     status.textContent='Encontradas '+data.found+' URLs en la página consultada. '+candidates.length+' candidatas nuevas cargadas para revisión. '+(data.urls.length-candidates.length)+' coincidencias descartadas. Ningún producto fue guardado.';
   }catch(e){status.textContent='Exploración no completada: '+e.message;}
   finally{discover.disabled=false;btn.disabled=false;}
