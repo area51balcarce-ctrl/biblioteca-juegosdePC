@@ -48,6 +48,7 @@ $('clear-backup').addEventListener('click',()=>{if(!confirm('¿Eliminar el respa
 save.disabled=false;
 $('halt').addEventListener('click',()=>{halt=true;$('halt').disabled=true;});
 $('auto').addEventListener('click',async()=>{if(busy)return;busy=true;halt=false;$('auto').disabled=true;$('halt').disabled=false;save.disabled=true;let ok=0,review=0;for(let i=0;i<rows.length;i++){if(halt)break;const item=rows[i];$('auto-status').textContent='Procesando '+(i+1)+'/'+rows.length+' — '+item.name;try{await item.enrich();ok++}catch(e){item.controls.result.textContent='Revisión manual: '+e.message;review++}if(i<rows.length-1&&!halt)await new Promise(resolve=>setTimeout(resolve,450));}$('auto-status').textContent='Finalizado: '+ok+' completados, '+review+' para revisión.'+(halt?' Detenido.':'')+' Ningún producto guardado ni publicado.';busy=false;$('auto').disabled=false;$('halt').disabled=true;save.disabled=false;});
+if(new URLSearchParams(location.search).get('autocompletar')==='1'){$('auto').click();}
 save.addEventListener('click',async()=>{const selected=rows.filter(x=>x.controls.check.checked);if(!selected.length){status.textContent='Seleccioná al menos una ficha.';return;}
 if(selected.some(x=>!x.controls.name.value.trim()||!x.controls.legal.value)){status.textContent='Completá nombre y base legal de cada ficha seleccionada.';return;}
 const names=selected.map(x=>x.controls.name.value.trim());const slugs=names.map(a51_slugify);if(new Set(slugs).size!==slugs.length){status.textContent='Hay nombres duplicados dentro de la selección.';return;}
