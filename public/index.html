@@ -386,8 +386,8 @@ form.addEventListener('submit',async e=>{
   const response=await fetch('/api/mis-compras?action=customer-requests',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({kind:document.getElementById('a51RequestKind').value,name:document.getElementById('a51RequestName').value})});
   const data=await response.json().catch(()=>({}));
   if(!response.ok){if(response.status===401){status.textContent='🔐 Primero iniciá sesión en tu cuenta: ';const a=document.createElement('a');a.href='/acceso/';a.textContent='Ingresar con mi correo';a.style.color='#31ef9b';status.append(a);return;}throw Error(data.error||'No se pudo enviar el pedido.');}
-  status.textContent='✅ '+data.message;form.reset();
- }catch(error){status.textContent=error.message;}finally{submit.disabled=false;}
+  status.textContent='✅ '+data.message;window.A51Notify?.success(data.message);form.reset();
+ }catch(error){status.textContent=error.message;window.A51Notify?.error(error.message);}finally{submit.disabled=false;}
 });
 })();
 </script>
@@ -409,5 +409,6 @@ form.addEventListener('submit',async e=>{
  });
 })();
 </script>
+<script src="/assets/notifications.js" defer></script>
 </body>
 </html>
