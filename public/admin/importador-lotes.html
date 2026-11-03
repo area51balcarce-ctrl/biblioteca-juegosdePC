@@ -22,4 +22,5 @@ status.textContent+=(stopped?' Proceso detenido.':' Lote terminado.');running=fa
 $('stop').addEventListener('click',()=>{stopped=true;$('stop').disabled=true;});
 $('prepare').addEventListener('click',()=>{const selected=reviewed.slice(0,5);if(!selected.length)return;sessionStorage.setItem('a51_import_draft_candidates_v1',JSON.stringify(selected));location.href='/admin/importador-borradores.html';});
 })();
-</script></body></html>
+</script><script src="/assets/notifications.js" defer></script>
+</body></html>
