@@ -20,4 +20,5 @@
  $('restore').onchange=async()=>{const f=$('restore').files[0];if(!f)return;try{if(f.size>80*1024*1024)throw Error('Respaldo demasiado grande');const j=JSON.parse(await f.text());if(j.version!==1||!Array.isArray(j.items))throw Error('Formato no reconocido');let count=0;for(const x of j.items){if(!x.id||!['torrent','magnet'].includes(x.type))continue;if(x.type==='torrent'){if(typeof x.base64!=='string')continue;const raw=atob(x.base64),bytes=Uint8Array.from(raw,c=>c.charCodeAt(0));if(bytes.length>10*1024*1024)continue;x.file=new File([bytes],x.name||'archivo.torrent',{type:'application/x-bittorrent'});delete x.base64}else if(!validMagnet(x.magnet||''))continue;await put(x);count++}$('status').textContent='Restaurados '+count+' registros.';await render()}catch(e){$('status').textContent='Error al restaurar: '+e.message}};
  $('search').oninput=render;await render();
 })().catch(e=>document.getElementById('status').textContent='No se pudo iniciar: '+e.message);
-</script></main></body></html>
+</script></main><script src="/assets/notifications.js" defer></script>
+</body></html>
