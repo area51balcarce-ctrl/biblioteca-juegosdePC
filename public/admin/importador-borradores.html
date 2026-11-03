@@ -63,8 +63,9 @@ for(const item of selected){const c=item.controls;try{
  const result=await a51_upsertProduct({name:c.name.value.trim(),slug,description:c.description.value.trim(),category:'Juego de PC',tags:c.tags.value.trim(),reqMin:c.reqMin.value.trim(),reqRec:c.reqRec.value.trim(),size:c.size.value.trim(),languages:c.languages.value.trim(),legalBasis:c.legal.value,status:'ok',coverFile,downloads:[]});
  if(!result.ok)throw result.error||Error('No se pudo guardar');c.result.textContent='✓ Ficha publicada con portada guardada';c.check.checked=false;c.check.disabled=true;success++;
 }catch(e){c.result.textContent='Error: '+(e.message||'No se pudo guardar');failed++;}
-status.textContent='Publicados: '+success+'. Omitidos o fallidos: '+failed+'. Sin enlaces de descarga.';}
+status.textContent='Publicados: '+success+'. Omitidos o fallidos: '+failed+'. Sin enlaces de descarga.';window.A51Notify?.show(status.textContent,failed?'warning':'success');}
 save.disabled=false;
 });
 })();
-</script></body></html>
+</script><script src="/assets/notifications.js" defer></script>
+</body></html>
