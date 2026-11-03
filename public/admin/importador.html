@@ -29,4 +29,5 @@ for(const url of urls){const tr=document.createElement('tr');tbody.append(tr);tr
 const response=await fetch('/api/igdb-data-v2?mode=import-preview&url='+encodeURIComponent(u.href));const data=await response.json();if(!response.ok)throw Error(data.error||'Error de lectura');
 const td=document.createElement('td');if(data.image){const img=document.createElement('img');img.src=data.image;img.alt='Portada externa (vista previa)';img.referrerPolicy='no-referrer';td.append(img);}tr.append(td);cell(tr,data.name);cell(tr,(data.genre||[]).join(', '));cell(tr,(data.description||'')+(data.igdb?' | IGDB: '+data.igdb:''));const link=document.createElement('a');link.href=data.url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Ver fuente';const last=document.createElement('td');last.append(link);tr.append(last);
 }catch(e){cell(tr,'Error');cell(tr,url);cell(tr,'');cell(tr,e.message);cell(tr,'');}done++;status.textContent='Analizadas '+done+' de '+urls.length+'. No se guardó ningún producto.';}btn.disabled=false;});})();
-</script></body></html>
+</script><script src="/assets/notifications.js" defer></script>
+</body></html>
