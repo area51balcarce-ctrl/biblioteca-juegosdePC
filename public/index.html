@@ -181,7 +181,7 @@ body{
 </style>
 </head>
 <body>
-<header class="shop-header"><div class="shop-wrap"><div><a href="/" class="shop-logo"><span>●</span> AREA 51</a><div class="shop-tagline">👽 TE ABDUCE A LA TECNOLOGÍA</div></div><nav class="shop-nav"><a href="mailto:area51.balcarce@gmail.com?subject=Soporte%20AREA%2051%20-%20Juegos%20PC" class="shop-btn secondary shop-support" style="display:inline-flex;align-items:center;white-space:nowrap" aria-label="Enviar correo a soporte de AREA 51">✉️ SOPORTE</a><a href="/mi-biblioteca/" class="shop-btn secondary" style="display:inline-flex;align-items:center;white-space:nowrap" aria-label="Ir a Mi Biblioteca">🎮 MIS JUEGOS</a><a href="/mis-compras/" class="shop-btn secondary" style="display:inline-flex;align-items:center;white-space:nowrap" aria-label="Ir a Mis Compras">👽 MIS COMPRAS</a><button type="button" id="a51OpenRequests" class="shop-btn secondary" style="white-space:nowrap">📩 PEDIDOS</button><button id="openCart" class="shop-btn" type="button" aria-controls="cartDrawer">🛒 Carrito (<span id="cartCount">0</span>)</button></nav></div></header>
+<header class="shop-header"><div class="shop-wrap"><div><a href="/" class="shop-logo"><span>●</span> AREA 51</a><div class="shop-tagline">👽 TE ABDUCE A LA TECNOLOGÍA</div></div><nav class="shop-nav"><a href="mailto:area51.balcarce@gmail.com?subject=Soporte%20AREA%2051%20-%20Juegos%20PC" class="shop-btn secondary shop-support" style="display:inline-flex;align-items:center;white-space:nowrap" aria-label="Enviar correo a soporte de AREA 51">✉️ SOPORTE</a><button type="button" id="a51InstallApp" class="shop-btn secondary" aria-haspopup="dialog" aria-controls="a51InstallHelp">📲 DESCARGAR APP</button><a href="/mi-biblioteca/" class="shop-btn secondary" style="display:inline-flex;align-items:center;white-space:nowrap" aria-label="Ir a Mi Biblioteca">🎮 MIS JUEGOS</a><a href="/mis-compras/" class="shop-btn secondary" style="display:inline-flex;align-items:center;white-space:nowrap" aria-label="Ir a Mis Compras">👽 MIS COMPRAS</a><button type="button" id="a51OpenRequests" class="shop-btn secondary" style="white-space:nowrap">📩 PEDIDOS</button><button id="openCart" class="shop-btn" type="button" aria-controls="cartDrawer">🛒 Carrito (<span id="cartCount">0</span>)</button></nav></div></header>
 <main>
 <section class="shop-hero"><div class="shop-wrap"><div class="shop-eyebrow">🛸 Biblioteca digital · PC</div><h1>Explorá juegos y software para tu PC</h1><p>Elegí tus favoritos, consultá sus requisitos y armá tu carrito. Comprá tus títulos favoritos con Mercado Pago y consultá tus compras desde tu biblioteca privada.</p></div></section>
 <section class="shop-wrap a51-help" id="como-comprar" aria-labelledby="a51-how-title">
@@ -426,5 +426,59 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 
+<style>
+/* Botón PWA visible en cabecera, incluso en celulares; no altera la navegación existente */
+.shop-nav #a51InstallApp{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;font-size:12px;padding:11px 12px}
+@media(max-width:600px){.shop-nav #a51InstallApp{display:inline-flex!important;font-size:11px;padding:9px 10px}.shop-nav{flex-wrap:wrap}}
+#a51InstallHelp[hidden]{display:none!important}
+#a51InstallHelp{position:fixed;inset:0;z-index:2147483100;background:#000b;display:grid;place-items:center;padding:16px}
+#a51InstallHelp .a51-install-panel{background:#101918;border:1px solid #31ef9b;border-radius:14px;color:#eaf7f1;padding:24px;max-width:440px;width:100%;box-shadow:0 18px 70px #000b;font:15px/1.6 system-ui,sans-serif}
+#a51InstallHelp h2{margin:0 0 10px;font-size:22px}#a51InstallHelp p{margin:9px 0}#a51InstallHelp .a51-install-actions{display:flex;justify-content:flex-end;margin-top:18px}
+</style>
+<div id="a51InstallHelp" hidden role="dialog" aria-modal="true" aria-labelledby="a51InstallTitle">
+ <section class="a51-install-panel">
+  <h2 id="a51InstallTitle">📲 Instalá AREA 51</h2>
+  <div id="a51InstallInstructions"></div>
+  <div class="a51-install-actions"><button type="button" id="a51InstallClose" class="shop-btn secondary">Entendido</button></div>
+ </section>
+</div>
+<script>
+/* Instalación PWA: solicita prompt solo si el navegador lo ofrece; nunca simula una descarga. */
+(()=>{
+ 'use strict';
+ let deferredInstall=null;
+ const button=document.getElementById('a51InstallApp');
+ const modal=document.getElementById('a51InstallHelp');
+ const body=document.getElementById('a51InstallInstructions');
+ const close=document.getElementById('a51InstallClose');
+ if(!button||!modal||!body||!close)return;
+ const installed=()=>window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+ const ios=()=>/iPhone|iPad|iPod/i.test(navigator.userAgent)||(/Macintosh/i.test(navigator.userAgent)&&navigator.maxTouchPoints>1);
+ const android=()=>/Android/i.test(navigator.userAgent);
+ const show=(paragraphs)=>{
+   body.replaceChildren();
+   for(const line of paragraphs){const p=document.createElement('p');p.textContent=line;body.append(p)}
+   modal.hidden=false;close.focus();
+ };
+ const hide=()=>{modal.hidden=true;button.focus()};
+ close.addEventListener('click',hide);
+ modal.addEventListener('click',e=>{if(e.target===modal)hide()});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!modal.hidden)hide()});
+ window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e});
+ window.addEventListener('appinstalled',()=>{deferredInstall=null;window.A51Notify?.success('AREA 51 se instaló correctamente.');button.textContent='✅ APP INSTALADA'});
+ button.addEventListener('click',async()=>{
+   if(installed()){show(['Ya estás usando AREA 51 como aplicación instalada.']);return}
+   if(deferredInstall){
+     const event=deferredInstall;deferredInstall=null;
+     try{await event.prompt();const choice=await event.userChoice;if(choice?.outcome==='accepted'){window.A51Notify?.success('Instalación aceptada. Revisá tu pantalla de inicio.')}else{show(['Cancelaste la instalación. Podés volver a intentarlo desde el menú del navegador.'])}}
+     catch{show(['El navegador no pudo iniciar la instalación automática. Usá la opción Instalar aplicación del menú de tu navegador.'])}
+     return;
+   }
+   if(ios()){show(['En iPhone o iPad, abrí esta página en Safari.','Tocá Compartir (el cuadrado con flecha hacia arriba).','Elegí “Agregar a pantalla de inicio” y confirmá “Agregar”.','Si estás en Chrome u otro navegador, abrí primero la página en Safari.']);return}
+   if(android()){show(['En Android, abrí esta página en Chrome o Edge.','Tocá el menú ⋮ del navegador.','Elegí “Instalar aplicación” o “Agregar a pantalla principal” y confirmá.','Si la opción no aparece, puede que la app ya esté instalada o que el navegador todavía no ofrezca la instalación.']);return}
+   show(['En Edge o Chrome para PC, abrí el menú ⋯ o ⋮ y buscá “Aplicaciones” → “Instalar este sitio como aplicación”.','Si aparece el ícono de instalación en la barra de direcciones, también podés usarlo.']);
+ });
+})();
+</script>
 </body>
 </html>
