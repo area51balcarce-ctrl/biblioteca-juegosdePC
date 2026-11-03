@@ -410,5 +410,21 @@ form.addEventListener('submit',async e=>{
 })();
 </script>
 <script src="/assets/notifications.js" defer></script>
+<style>
+/* AREA 51: únicamente posición de campanita en la cabecera pública */
+.shop-nav #a51-notify-toggle{position:static;inset:auto;z-index:auto;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;margin:0;padding:0;border:1px solid var(--shop-line);border-radius:7px;background:transparent;box-shadow:none;font-size:0;line-height:1}
+.shop-nav #a51-notify-toggle::before{content:"🔔";font-size:19px;line-height:1}
+.shop-nav #a51-notify-toggle:hover{border-color:var(--shop-green);background:#123527}
+</style>
+<script>
+/* Mueve el control EXISTENTE, preservando sus eventos y permisos. */
+document.addEventListener('DOMContentLoaded',()=>{
+ const bell=document.getElementById('a51-notify-toggle');
+ const nav=document.querySelector('.shop-header .shop-nav');
+ const support=nav?.querySelector('.shop-support');
+ if(bell&&nav&&support)nav.insertBefore(bell,support);
+});
+</script>
+
 </body>
 </html>
