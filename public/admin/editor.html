@@ -374,6 +374,7 @@ form .section h2{color:#81ff50}
     const box = document.getElementById('form-error');
     box.textContent = message;
     box.classList.add('show');
+    window.A51Notify?.error(message);
   }
   function hideError(){
     document.getElementById('form-error').classList.remove('show');
@@ -1358,6 +1359,7 @@ form .section h2{color:#81ff50}
 
     const fb = document.getElementById('save-feedback');
     fb.classList.add('show');
+    window.A51Notify?.success('Producto guardado correctamente.');
     setTimeout(() => { location.assign('/admin/dashboard'); }, 700);
   });
 
@@ -1389,5 +1391,6 @@ form .section h2{color:#81ff50}
     }
   })();
 </script>
+<script src="/assets/notifications.js" defer></script>
 </body>
 </html>
