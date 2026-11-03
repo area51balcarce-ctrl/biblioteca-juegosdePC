@@ -608,7 +608,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
     }catch(error){
       console.error(error);
       button.textContent = 'Error';
-      alert('La revisión no pudo completarse. Los enlaces que ya fueron comprobados conservaron su resultado.');
+      A51Notify.error('La revisión no pudo completarse. Los enlaces que ya fueron comprobados conservaron su resultado.');
       setTimeout(() => { button.textContent = original; }, 2200);
     }finally{
       button.disabled = false;
@@ -639,7 +639,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
     );
 
     if(!queue.length){
-      alert('No hay enlaces habilitados para verificar.');
+      A51Notify.info('No hay enlaces habilitados para verificar.');
       return;
     }
 
@@ -702,7 +702,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
         `Caídos: ${totals.down}` +
         (totals.errors ? `\nErrores de guardado: ${totals.errors}` : '');
 
-      alert(message);
+      A51Notify.info(message);
     }finally{
       VERIFYING_ALL = false;
       button.disabled = false;
@@ -732,7 +732,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
     if(!confirm('¿Eliminar este producto del catálogo? Esta acción no se puede deshacer.')) return;
     const result = await a51_deleteProduct(slug);
     if(!result.ok){
-      alert('No se pudo eliminar el producto. Probá de nuevo.');
+      A51Notify.error('No se pudo eliminar el producto. Probá de nuevo.');
       console.error(result.error);
       return;
     }
@@ -834,5 +834,6 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
     await loadProducts();
   })();
 </script>
+<script src="/assets/notifications.js" defer></script>
 </body>
 </html>
