@@ -32,7 +32,7 @@ function show(text,kind='info',opts={}){
  const duration=Number.isFinite(opts.duration)?Math.max(1500,opts.duration):k==='error'?9000:6000;
  setTimeout(()=>item.remove(),duration);
  if(opts.native!==false&&supported()&&enabled()&&Notification.permission==='granted'&&document.visibilityState==='hidden'){
-   try{new Notification('AREA 51 · '+title,{body:msg.slice(0,230),icon:'/assets/area51-app-icon.svg',tag:'a51-'+k})}catch(e){console.debug('Aviso nativo no disponible:',e)}
+   try{new Notification('AREA 51 · '+title,{body:msg.slice(0,230),icon:'/assets/area51-app-icon-192.png',tag:'a51-'+k})}catch(e){console.debug('Aviso nativo no disponible:',e)}
  }
 }
 toggle.addEventListener('click',async()=>{
