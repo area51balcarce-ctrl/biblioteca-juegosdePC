@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Centro de Escaneo · AREA 51</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#080e0b;color:#e9f6ec;font:15px system-ui,-apple-system,Segoe UI,sans-serif}main{max-width:1250px;margin:auto;padding:20px 16px 40px}a{color:#adff40}header{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}h1{font-size:clamp(24px,4vw,34px);margin:16px 0 6px}p{color:#b9cbbd;line-height:1.55}.panel{background:#101913;border:1px solid #36533c;border-radius:14px;padding:18px;margin-top:18px}.tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}.tab{cursor:pointer;border:1px solid #426247;background:#162219;color:#dff0df;border-radius:12px;padding:15px;text-align:left;font:inherit;font-weight:700}.tab[aria-selected=true]{border-color:#b1ff46;background:#244027;color:#c7ff76}.tab small{display:block;margin-top:5px;color:#b7c8b8;font-weight:400}.actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center}.actions a{display:inline-block;border:1px solid #486a4c;padding:10px 13px;border-radius:9px;text-decoration:none}.actions a:hover{background:#1c3020}.frame{width:100%;height:820px;border:1px solid #35513a;border-radius:12px;background:#090e0b;display:block}#frame-help{font-size:13px}.note{font-size:13px;color:#c5d4c5}@media(max-width:650px){.tabs{grid-template-columns:1fr}.frame{height:850px}main{padding:14px 9px}.panel{padding:10px}}
+</style>
+</head>
+<body>
+<main>
+<header><a href="/admin/dashboard.html">← Volver al panel</a><span>👽 AREA 51 · Herramientas administrativas</span></header>
+<h1>🛸 Centro de Escaneo</h1>
+<p>Dos herramientas, un solo lugar. Elegí qué necesitás hacer y seguí trabajando con los módulos existentes, sin alterar sus funciones.</p>
+<div class="tabs" role="tablist" aria-label="Modo de escaneo">
+<button class="tab" id="tab-games" type="button" role="tab" aria-controls="tool" aria-selected="true">🎮 Escanear juegos<small>Catálogo, duplicados, fichas y metadatos IGDB</small></button>
+<button class="tab" id="tab-links" type="button" role="tab" aria-controls="tool" aria-selected="false">🧲 Revisar enlaces autorizados<small>Vista previa de enlaces en páginas que permiten su uso</small></button>
+</div>
+<section class="panel">
+<div class="actions"><a href="/admin/importador-borradores.html">📦 Revisar borradores y publicar</a><a href="/admin/importador-lotes.html">📚 Importador por lotes</a><a href="/admin/importador-manifiesto.html">📄 Importar manifiesto</a></div>
+<p id="frame-help">Usá el escáner directamente abajo. El módulo original se mantiene intacto.</p>
+<iframe id="tool" class="frame" title="Escáner de juegos AREA 51" src="/admin/importador-inteligente.html" loading="eager"></iframe>
+<p class="note">🔒 Las publicaciones siguen requiriendo revisión. La detección de enlaces no comprueba permisos de distribución. Si una herramienta no se visualiza bien aquí, <a id="open-tool" href="/admin/importador-inteligente.html" target="_blank" rel="noopener">abrila en una pestaña independiente</a>.</p>
+</section>
+</main>
+<script>
+(function(){
+'use strict';
+const modes={
+games:{url:'/admin/importador-inteligente.html',title:'Escáner de juegos AREA 51',help:'Pegá la URL del catálogo, prepará los juegos y después revisá los borradores.'},
+links:{url:'/admin/importador-extractor-autorizado.html',title:'Extractor de enlaces autorizados AREA 51',help:'Pegá una URL HTTPS de una fuente que permita el uso de sus enlaces. Solo genera una vista previa.'}
+};
+const frame=document.getElementById('tool'),open=document.getElementById('open-tool'),help=document.getElementById('frame-help');
+const tabs={games:document.getElementById('tab-games'),links:document.getElementById('tab-links')};
+let active='games';
+function select(key){
+if(key===active)return;
+active=key;
+for(const [id,tab] of Object.entries(tabs))tab.setAttribute('aria-selected',String(id===key));
+frame.src=modes[key].url;frame.title=modes[key].title;open.href=modes[key].url;help.textContent=modes[key].help;
+}
+tabs.games.addEventListener('click',()=>select('games'));
+tabs.links.addEventListener('click',()=>select('links'));
+})();
+</script>
+</body>
+</html>
