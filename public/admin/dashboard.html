@@ -401,7 +401,20 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
     </div>
   </main>
 </div>
-
+<div id="a51-torrent-dialog" hidden style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:18px">
+  <div role="dialog" aria-modal="true" aria-labelledby="a51-torrent-title" style="background:#101713;color:#eef7ef;border:1px solid #aaff40;border-radius:14px;padding:22px;width:min(480px,100%);box-shadow:0 18px 60px #000">
+    <h2 id="a51-torrent-title" style="margin:0 0 12px">🧲 Agregar Torrent</h2>
+    <p id="a51-torrent-name"></p>
+    <label for="a51-torrent-file">Seleccionar archivo .torrent</label>
+    <input id="a51-torrent-file" type="file" accept=".torrent" style="display:block;width:100%;margin:12px 0">
+    <p id="a51-torrent-status" aria-live="polite"></p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button type="button" id="a51-torrent-save" class="btn btn-primary" onclick="saveTorrentQuick()">💾 Guardar Torrent</button>
+      <button type="button" class="btn" onclick="closeTorrentQuick()">Cancelar</button>
+    </div>
+  </div>
+</div>
+<style>#a51-torrent-dialog[hidden]{display:none!important}</style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="../assets/config.js"></script>
 <script src="../assets/store.js"></script>
@@ -531,11 +544,50 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
         <td>${badge(g.status)}</td>
         <td class="mono">${esc(g.updated || '—')}</td>
         <td><div class="download-summary">${downloadSummary(g)}<div class="health-actions"><button class="health-btn" type="button" onclick="toggleDownloads('${esc(g.id)}')" ${downloads.length ? '' : 'disabled'}>Ver enlaces</button><button class="health-btn" type="button" onclick="verifyDownloads(this,'${esc(g.id)}')" ${downloads.length ? '' : 'disabled'}>Verificar</button></div></div></td>
-        <td><div class="api-actions"><button class="copy-btn" data-copy="${esc(g.id)}" onclick="copyValue(this,'ID copiado ✓')">Copiar ID</button><button class="copy-btn" data-copy="${esc(BASE_URL + slug)}" onclick="copyValue(this,'Enlace copiado ✓')">Copiar enlace</button><button class="copy-btn" data-copy="${esc(integrationCode)}" onclick="copyValue(this,'Código copiado ✓')">Copiar integración</button></div></td>
+        <td><div class="api-actions"><button class="copy-btn" data-copy="${esc(g.id)}" onclick="copyValue(this,'ID copiado ✓')">Copiar ID</button><button class="copy-btn" data-copy="${esc(BASE_URL + slug)}" onclick="copyValue(this,'Enlace copiado ✓')">Copiar enlace</button><button class="copy-btn" data-copy="${esc(integrationCode)}" onclick="copyValue(this,'Código copiado ✓')">Copiar integración</button><button class="copy-btn" type="button" onclick="openTorrentQuick('${esc(g.id)}')" style="border-color:#aaff40;color:#aaff40">🧲 Agregar Torrent</button></div></td>
         <td><div class="row-actions"><a class="icon-btn" title="Editar" href="/admin/editor?slug=${slug}">✎</a><button class="icon-btn" type="button" title="Eliminar" data-slug="${esc(g.slug)}" onclick="removeProduct(this.dataset.slug)">🗑</button></div></td>
       </tr>
       <tr id="downloads-${esc(g.id)}" class="download-panel"><td colspan="8"><div class="download-list">${detailRows}</div></td></tr>`;
     }).join('');
+  }
+
+  // AREA 51: carga rapida de .torrent, independiente del editor completo.
+  let quickTorrentProductId=null;
+  function openTorrentQuick(productId){
+    const product=ALL_PRODUCTS.find(item=>item.id===productId);
+    if(!product)return;
+    quickTorrentProductId=productId;
+    const dialog=document.getElementById('a51-torrent-dialog');
+    document.getElementById('a51-torrent-name').textContent=product.name;
+    document.getElementById('a51-torrent-file').value='';
+    document.getElementById('a51-torrent-status').textContent='';
+    dialog.hidden=false;
+  }
+  function closeTorrentQuick(){
+    if(document.getElementById('a51-torrent-save').disabled)return;
+    document.getElementById('a51-torrent-dialog').hidden=true;
+    quickTorrentProductId=null;
+  }
+  async function saveTorrentQuick(){
+    const product=ALL_PRODUCTS.find(item=>item.id===quickTorrentProductId);
+    const file=document.getElementById('a51-torrent-file').files[0];
+    const status=document.getElementById('a51-torrent-status');
+    if(!product){status.textContent='No se encontró el producto.';return;}
+    if(!file||!file.name.toLowerCase().endsWith('.torrent')){status.textContent='Seleccioná un archivo .torrent válido.';return;}
+    if(file.size>250*1024*1024){status.textContent='El archivo supera 250 MB.';return;}
+    if(product.files?.main?.path&&!confirm('Este producto ya tiene un archivo principal. ¿Reemplazarlo por el Torrent seleccionado?'))return;
+    const button=document.getElementById('a51-torrent-save');
+    button.disabled=true;status.textContent='Subiendo Torrent…';
+    try{
+      const result=await a51_syncProductFiles(product.id,{mainFile:file,prevMain:product.files?.main||null});
+      if(!result.ok)throw result.error||new Error('No se pudo guardar el archivo');
+      status.textContent='✓ Torrent guardado correctamente.';
+      document.getElementById('a51-torrent-dialog').hidden=true;
+      quickTorrentProductId=null;
+      await loadProducts();
+      window.A51Notify?.success('Torrent agregado correctamente.');
+    }catch(error){status.textContent='Error: '+(error?.message||String(error));}
+    finally{button.disabled=false;}
   }
 
   function toggleDownloads(productId){
