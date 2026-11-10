@@ -641,7 +641,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
       // AREA 51: resolver enlaces reales guardados, sin inventar slugs ni descargas.
       const key='a51-game-source:'+product.id;
       const stored=localStorage.getItem(key);
-      const candidates=[stored,product.sourceUrl,product.source_url,product.originUrl,product.origin_url,product.sourcePage,product.source_page,product.source].filter(v=>typeof v==='string'&&v.trim());
+      const candidates=[stored,localStorage.getItem('a51-game-source-name:'+String(product.slug||'').trim()),product.sourceUrl,product.source_url,product.originUrl,product.origin_url,product.sourcePage,product.source_page,product.source].filter(v=>typeof v==='string'&&v.trim());
       let verified=null;
       for(const candidate of candidates){
         try{
