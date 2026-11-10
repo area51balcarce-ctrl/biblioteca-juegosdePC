@@ -638,25 +638,26 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
       state.textContent='⚠ Sin enlaces ni respaldo BitTorrent';
       const action=document.createElement('td');
       const link=document.createElement('a');
-      // AREA 51: solo usar URLs reales registradas por el administrador.
-      // No inferir slugs: los titulos y las rutas pueden ser diferentes.
+      // AREA 51: resolver enlaces reales guardados, sin inventar slugs ni descargas.
       const key='a51-game-source:'+product.id;
       const stored=localStorage.getItem(key);
-      if(stored){
+      const candidates=[stored,product.sourceUrl,product.source_url,product.originUrl,product.origin_url,product.sourcePage,product.source_page,product.source].filter(v=>typeof v==='string'&&v.trim());
+      let verified=null;
+      for(const candidate of candidates){
         try{
-          const url=new URL(stored);
-          if(url.protocol==='https:' && (url.hostname==='gamestorrents.app'||url.hostname==='www.gamestorrents.app') && url.pathname.startsWith('/juegos-pc/')){
-            url.hash='releases';
-            link.href=url.href;
-            link.textContent='🎮 Abrir versiones';
-            link.title='Abrir la ficha registrada para este juego';
-            link.target='_blank';link.rel='noopener noreferrer';
-            link.style.color='#aaff40';
-            action.append(link);
-            action.append(document.createTextNode(' · '));
+          const url=new URL(candidate);
+          if(url.protocol==='https:' && ['gamestorrents.app','www.gamestorrents.app'].includes(url.hostname) && /^\\/juegos-pc\\/[^/]+/.test(url.pathname)){
+            url.hash='releases';verified=url.href;break;
           }
-        }catch(error){console.warn('Enlace de ficha inválido',error);}
+        }catch(error){}
       }
+      link.href=verified||'https://www.google.com/search?q='+encodeURIComponent('site:gamestorrents.app/juegos-pc/ "'+(product.name||'')+'"');
+      link.textContent=verified?'🎮 IR A DESCARGA':'🔎 Buscar ficha';
+      link.title=verified?'Abrir directamente Versiones y fuentes':'No hay URL exacta registrada; buscar la ficha del juego';
+      link.target='_blank';link.rel='noopener noreferrer';
+      link.style.color='#aaff40';
+      action.append(link);
+      action.append(document.createTextNode(' · '));
       const register=document.createElement('button');
       register.type='button';
       register.textContent=stored?'✏️ Cambiar enlace':'🔗 Guardar enlace';
@@ -675,12 +676,6 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
         }catch(error){alert('Pegá una dirección HTTPS válida de una ficha de GameStorrents (/juegos-pc/...).');}
       });
       action.append(register);
-      const search=document.createElement('a');
-      search.href='https://www.google.com/search?q='+encodeURIComponent('site:gamestorrents.app/juegos-pc/ "'+(product.name||'')+'"');
-      search.target='_blank';search.rel='noopener noreferrer';
-      search.textContent='🔎 Buscar ficha';
-      search.style.color='#aaff40';
-      action.append(search);
       for(const cell of [title,state,action]){cell.style.cssText='padding:10px;border-bottom:1px solid #36533c;vertical-align:top';tr.append(cell);}
       body.append(tr);
     }
