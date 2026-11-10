@@ -335,6 +335,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
         <div class="operator-note">Buscá un juego y copiá su enlace público.</div>
       </div>
       <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn" id="a51-bulk-open" type="button">📂 Escanear carpeta de Torrents</button>
         <button class="btn bulk-check-btn" id="verify-all-btn" type="button">⌁ Verificar todo</button>
         <a class="btn btn-primary btn-new-product" href="/admin/editor">+ Nuevo producto</a>
       </div>
@@ -415,6 +416,24 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
   </div>
 </div>
 <style>#a51-torrent-dialog[hidden]{display:none!important}</style>
+<div id="a51-bulk-dialog" hidden style="position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9998;overflow:auto;padding:24px 12px">
+  <div role="dialog" aria-modal="true" aria-labelledby="a51-bulk-title" style="max-width:900px;margin:2vh auto;background:#0e1912;color:#eaf7ea;border:1px solid #78ca41;border-radius:14px;padding:22px">
+    <h2 id="a51-bulk-title">📂 Escanear carpeta de Torrents</h2>
+    <p>Seleccioná una carpeta de tu PC. Se compararán los archivos .torrent con los juegos publicados; solo se propondrán coincidencias exactas y sin respaldo existente.</p>
+    <label for="a51-bulk-files">Carpeta de archivos .torrent</label>
+    <input id="a51-bulk-files" type="file" accept=".torrent" webkitdirectory multiple style="display:block;width:100%;margin:12px 0">
+    <p id="a51-bulk-summary" aria-live="polite">Esperando selección de carpeta…</p>
+    <div style="overflow:auto;max-height:48vh;border:1px solid #36533c;border-radius:8px">
+      <table style="width:100%;font-size:12px"><thead><tr><th>Archivo</th><th>Juego encontrado</th><th>Resultado</th></tr></thead><tbody id="a51-bulk-results"></tbody></table>
+    </div>
+    <p id="a51-bulk-status" aria-live="polite">No se subirá nada sin tu confirmación.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+      <button class="btn btn-primary" id="a51-bulk-upload" type="button" disabled>⬆ Subir Torrents coincidentes</button>
+      <button class="btn" id="a51-bulk-cancel" type="button">Cerrar</button>
+    </div>
+  </div>
+</div>
+<style>#a51-bulk-dialog[hidden]{display:none!important}</style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="../assets/config.js"></script>
 <script src="../assets/store.js"></script>
@@ -890,6 +909,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
     await loadProducts();
   })();
 </script>
+<script src="/assets/a51-bulk-torrents.js" defer></script>
 <script src="/assets/notifications.js" defer></script>
 </body>
 </html>
