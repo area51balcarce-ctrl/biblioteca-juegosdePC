@@ -336,6 +336,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
       </div>
       <div style="display:flex; gap:10px; flex-wrap:wrap;">
         <button class="btn" id="a51-bulk-open" type="button">📂 Escanear carpeta de Torrents</button>
+        <button class="btn" id="a51-pending-search-open" type="button">🔎 Buscar Torrents pendientes</button>
         <button class="btn bulk-check-btn" id="verify-all-btn" type="button">⌁ Verificar todo</button>
         <a class="btn btn-primary btn-new-product" href="/admin/editor">+ Nuevo producto</a>
       </div>
@@ -434,6 +435,18 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
   </div>
 </div>
 <style>#a51-bulk-dialog[hidden]{display:none!important}</style>
+<div id="a51-pending-search-dialog" hidden style="position:fixed;inset:0;z-index:9997;background:rgba(0,0,0,.87);overflow:auto;padding:24px 12px">
+  <div role="dialog" aria-modal="true" aria-labelledby="a51-pending-search-title" style="max-width:940px;margin:2vh auto;background:#0e1912;color:#eaf7ea;border:1px solid #78ca41;border-radius:14px;padding:22px">
+    <h2 id="a51-pending-search-title">🔎 Juegos pendientes de Torrent</h2>
+    <p>Juegos publicados sin enlaces ni respaldo BitTorrent. Abrí la búsqueda del título en otra pestaña, descargá manualmente los archivos que tengas derecho a utilizar y asocialos desde el panel.</p>
+    <p id="a51-pending-search-summary" aria-live="polite"></p>
+    <div style="max-height:60vh;overflow:auto;border:1px solid #36533c;border-radius:8px">
+      <table style="width:100%;font-size:12px"><thead><tr><th>Juego</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="a51-pending-search-rows"></tbody></table>
+    </div>
+    <button class="btn" type="button" id="a51-pending-search-close" style="margin-top:16px">Cerrar</button>
+  </div>
+</div>
+<style>#a51-pending-search-dialog[hidden]{display:none!important}</style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="../assets/config.js"></script>
 <script src="../assets/store.js"></script>
@@ -608,6 +621,36 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
     }catch(error){status.textContent='Error: '+(error?.message||String(error));}
     finally{button.disabled=false;}
   }
+
+  // AREA 51: buscador de fichas pendientes, sin descargas automaticas.
+  function openPendingSearch(){
+    const dialog=document.getElementById('a51-pending-search-dialog');
+    const body=document.getElementById('a51-pending-search-rows');
+    const summary=document.getElementById('a51-pending-search-summary');
+    body.replaceChildren();
+    const pending=ALL_PRODUCTS.filter(product=>product.status==='ok'&&availabilityState(product).noSource);
+    summary.textContent=pending.length+' juego(s) publicado(s) sin enlaces ni respaldo BitTorrent.';
+    for(const product of pending){
+      const tr=document.createElement('tr');
+      const title=document.createElement('td');
+      title.textContent=product.name||'Sin nombre';
+      const state=document.createElement('td');
+      state.textContent='⚠ Sin enlaces ni respaldo BitTorrent';
+      const action=document.createElement('td');
+      const link=document.createElement('a');
+      link.href='https://www.google.com/search?q='+encodeURIComponent('site:gamestorrents.app/juegos-pc/ "'+(product.name||'')+'"');
+      link.target='_blank';link.rel='noopener noreferrer';
+      link.textContent='🔎 Buscar ficha';
+      link.style.color='#aaff40';
+      action.append(link);
+      for(const cell of [title,state,action]){cell.style.cssText='padding:10px;border-bottom:1px solid #36533c;vertical-align:top';tr.append(cell);}
+      body.append(tr);
+    }
+    if(!pending.length){const tr=document.createElement('tr');const td=document.createElement('td');td.colSpan=3;td.textContent='No hay juegos pendientes con esta condición.';td.style.padding='14px';tr.append(td);body.append(tr);}
+    dialog.hidden=false;
+  }
+  document.getElementById('a51-pending-search-open').addEventListener('click',openPendingSearch);
+  document.getElementById('a51-pending-search-close').addEventListener('click',()=>{document.getElementById('a51-pending-search-dialog').hidden=true;});
 
   function toggleDownloads(productId){
     document.getElementById(`downloads-${productId}`)?.classList.toggle('open');
