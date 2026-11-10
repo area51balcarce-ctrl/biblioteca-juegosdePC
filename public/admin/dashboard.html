@@ -676,6 +676,17 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
         }catch(error){alert('Pegá una dirección HTTPS válida de una ficha de GameStorrents (/juegos-pc/...).');}
       });
       action.append(register);
+      // Acceso rapido adicional: nunca inicia una descarga sin intervencion del usuario.
+      const downloadShortcut=document.createElement('a');
+      downloadShortcut.href=verified||link.href;
+      downloadShortcut.target='_blank';
+      downloadShortcut.rel='noopener noreferrer';
+      downloadShortcut.textContent='⬇ DESCARGAR TORRENT';
+      downloadShortcut.title=verified
+        ? 'Abrir Versiones y fuentes para descargar manualmente'
+        : 'Todavía no hay URL exacta: abre la búsqueda del juego para descargar manualmente';
+      downloadShortcut.style.cssText='display:inline-block;background:#aaff40;color:#09130a;border-radius:4px;padding:6px 9px;margin:4px 0;font-size:11px;font-weight:bold;text-decoration:none;white-space:nowrap';
+      action.append(downloadShortcut);
       for(const cell of [title,state,action]){cell.style.cssText='padding:10px;border-bottom:1px solid #36533c;vertical-align:top';tr.append(cell);}
       body.append(tr);
     }
