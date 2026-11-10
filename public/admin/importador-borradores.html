@@ -57,11 +57,23 @@ save.disabled=false;
 $('halt').addEventListener('click',()=>{halt=true;$('halt').disabled=true;});
 $('auto').addEventListener('click',async()=>{if(busy)return;busy=true;halt=false;$('auto').disabled=true;$('halt').disabled=false;save.disabled=true;let ok=0,review=0;for(let i=0;i<rows.length;i++){if(halt)break;const item=rows[i];$('auto-status').textContent='Procesando '+(i+1)+'/'+rows.length+' — '+item.name;try{await item.enrich();ok++}catch(e){item.controls.result.textContent='Revisión manual: '+e.message;review++}if(i<rows.length-1&&!halt)await new Promise(resolve=>setTimeout(resolve,450));}$('auto-status').textContent='Finalizado: '+ok+' completados, '+review+' para revisión.'+(halt?' Detenido.':'')+' Ningún producto guardado ni publicado.';busy=false;$('auto').disabled=false;$('halt').disabled=true;save.disabled=false;});
 if(new URLSearchParams(location.search).get('autocompletar')==='1'){$('auto').click();}
-save.addEventListener('click',async()=>{const selected=rows.filter(x=>x.controls.check.checked);if(!selected.length){status.textContent='Seleccioná al menos una ficha.';return;}
+save.addEventListener('click',async()=>{let selected=rows.filter(x=>x.controls.check.checked);if(!selected.length){status.textContent='Seleccioná al menos una ficha.';return;}
 if(selected.some(x=>!x.controls.name.value.trim()||!x.controls.legal.value)){status.textContent='Completá nombre y base legal de cada ficha seleccionada.';return;}
 const names=selected.map(x=>x.controls.name.value.trim());const slugs=names.map(a51_slugify);if(new Set(slugs).size!==slugs.length){status.textContent='Hay nombres duplicados dentro de la selección.';return;}
 if(!$('legal-confirm').checked){status.textContent='Confirmá la autorización de publicación antes de continuar.';return;}
-const missingCovers=selected.filter(x=>!x.coverUrl);if(missingCovers.length){status.textContent='Falta portada automática en '+missingCovers.length+' ficha(s): '+missingCovers.map(x=>x.controls.name.value.trim()||x.name).join(', ')+'. Buscá su portada con IGDB o desmarcá esas fichas para publicar el resto.';return;}
+const missingCovers=selected.filter(x=>!x.coverUrl);
+if(missingCovers.length){
+ const names=missingCovers.map(x=>x.controls.name.value.trim()||x.name);
+ const valid=selected.filter(x=>!!x.coverUrl);
+ if(!valid.length){
+  status.textContent='Ninguna ficha seleccionada tiene portada automática registrada. Buscá y aplicá una portada desde IGDB antes de publicar. Fichas pendientes: '+names.join(', ');
+  return;
+ }
+ if(!confirm('Hay '+missingCovers.length+' ficha(s) sin portada: '+names.join(', ')+'.\\n\\n¿Publicar las '+valid.length+' fichas completas y dejar las que no tienen portada pendientes para revisar?')){status.textContent='Publicación cancelada. Podés corregir las portadas o desmarcar las fichas pendientes.';return;}
+ for(const item of missingCovers){item.controls.check.checked=false;item.controls.result.textContent='Pendiente: falta portada automática. No se publicará esta ficha.';}
+ selected=valid;
+ status.textContent='Se excluyeron '+missingCovers.length+' fichas sin portada. Se publicarán solo las '+selected.length+' fichas completas.';
+}
 if(!confirm('Se publicarán '+selected.length+' fichas con portada automática y SIN enlaces de descarga. ¿Confirmás que tenés autorización?'))return;
 save.disabled=true;let success=0,failed=0;
 for(const item of selected){const c=item.controls;try{
