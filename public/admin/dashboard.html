@@ -374,6 +374,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
         <option value="covered">Con respaldo BitTorrent</option>
         <option value="no-torrent">Sin respaldo BitTorrent</option>
         <option value="published-no-torrent">🆕 Publicados sin Torrent</option>
+        <option value="no-source">⚠ Sin enlaces ni respaldo BitTorrent</option>
         <option value="links">Con enlaces</option>
         <option value="no-links">Sin enlaces</option>
       </select>
@@ -759,6 +760,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
         (availability === 'covered' && state.torrent) ||
         (availability === 'no-torrent' && !state.torrent) ||
         (availability === 'published-no-torrent' && g.status === 'ok' && !state.torrent) ||
+        (availability === 'no-source' && state.noSource) ||
         (availability === 'links' && state.downloads.length > 0) ||
         (availability === 'no-links' && state.downloads.length === 0);
 
