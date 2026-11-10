@@ -9,6 +9,22 @@ bell.setAttribute('aria-label','Abrir notificaciones de AREA 51');
 bell.style.cssText='border:1px solid #655b98;border-radius:12px;padding:9px 12px;white-space:nowrap';
 bell.textContent='🔔';if(header)header.append(bell);
 const status=$('a51NotificationStatus'),list=$('a51NotificationList'),count=$('a51NotificationCount');
+const heading=count?.closest('h2');
+const markAll=document.createElement('button');
+markAll.type='button';markAll.textContent='✅ Marcar todas como leídas';
+markAll.hidden=true;
+markAll.style.cssText='margin-left:12px;padding:8px 12px;border-radius:8px;cursor:pointer';
+if(heading)heading.append(markAll);
+markAll.addEventListener('click',async()=>{
+ if(markAll.disabled)return;
+ markAll.disabled=true;markAll.textContent='⏳ Marcando…';
+ try{
+  const result=await request({method:'POST',body:JSON.stringify({mark_all:true})});
+  if(result)await load();
+ }catch(e){status.textContent='No se pudieron marcar todas: '+e.message;}
+ finally{markAll.disabled=false;markAll.textContent='✅ Marcar todas como leídas';}
+});
+
 async function request(options){
  const response=await fetch('/api/mis-compras?action=customer-notifications',{
   credentials:'same-origin',cache:'no-store',
@@ -24,6 +40,7 @@ function render(data){
  section.hidden=false;bell.hidden=false;
  bell.textContent=data.unread?'🔔 '+data.unread:'🔔';
  count.textContent=data.unread?'('+data.unread+' sin leer)':'(al día)';
+ markAll.hidden=!(data.unread>0);
  list.replaceChildren();
  if(!data.notifications?.length){status.textContent='Todavía no tenés notificaciones.';return;}
  status.textContent='Tus últimas novedades:';
