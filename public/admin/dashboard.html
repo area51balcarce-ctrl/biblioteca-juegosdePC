@@ -646,7 +646,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
       for(const candidate of candidates){
         try{
           const url=new URL(candidate);
-          if(url.protocol==='https:' && ['gamestorrents.app','www.gamestorrents.app'].includes(url.hostname) && /^\\/juegos-pc\\/[^/]+/.test(url.pathname)){
+          if(url.protocol==='https:' && ['gamestorrents.app','www.gamestorrents.app'].includes(url.hostname) && url.pathname.startsWith('/juegos-pc/') && url.pathname.length > '/juegos-pc/'.length){
             url.hash='releases';verified=url.href;break;
           }
         }catch(error){}
