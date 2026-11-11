@@ -651,9 +651,15 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
           }
         }catch(error){}
       }
-      link.href=verified||'https://www.google.com/search?q='+encodeURIComponent('site:gamestorrents.app/juegos-pc/ "'+(product.name||'')+'"');
-      link.textContent=verified?'🎮 IR A DESCARGA':'🔎 Buscar ficha';
-      link.title=verified?'Abrir directamente Versiones y fuentes':'No hay URL exacta registrada; buscar la ficha del juego';
+      // URL comprobada visualmente para este titulo; sin inferir enlaces para otros juegos.
+      const knownDownload=String(product.name||'').trim().toLowerCase()==='another eden begins'
+        ? 'https://www.gamestorrents.app/descarga/4b6f5ea887bb34b812708ae2e4f35023/'
+        : null;
+      const directDestination=knownDownload||verified;
+      link.href=directDestination||'https://www.gamestorrents.app/';
+
+      link.textContent=directDestination?'🎮 IR A DESCARGA':'🔎 Buscar ficha';
+      link.title=directDestination?'Abrir página de descarga identificada':'Sin URL identificada: abrir buscador de GameStorrents';
       link.target='_blank';link.rel='noopener noreferrer';
       link.style.color='#aaff40';
       action.append(link);
@@ -678,13 +684,13 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
       action.append(register);
       // Acceso rapido adicional: nunca inicia una descarga sin intervencion del usuario.
       const downloadShortcut=document.createElement('a');
-      downloadShortcut.href=verified||link.href;
+      downloadShortcut.href=directDestination||link.href;
       downloadShortcut.target='_blank';
       downloadShortcut.rel='noopener noreferrer';
       downloadShortcut.textContent='⬇ DESCARGAR TORRENT';
-      downloadShortcut.title=verified
-        ? 'Abrir Versiones y fuentes para descargar manualmente'
-        : 'Todavía no hay URL exacta: abre la búsqueda del juego para descargar manualmente';
+      downloadShortcut.title=directDestination
+        ? 'Abrir destino identificado para descarga manual'
+        : 'Sin URL exacta: abrir GameStorrents y buscar manualmente';
       downloadShortcut.style.cssText='display:inline-block;background:#aaff40;color:#09130a;border-radius:4px;padding:6px 9px;margin:4px 0;font-size:11px;font-weight:bold;text-decoration:none;white-space:nowrap';
       action.append(downloadShortcut);
       for(const cell of [title,state,action]){cell.style.cssText='padding:10px;border-bottom:1px solid #36533c;vertical-align:top';tr.append(cell);}
