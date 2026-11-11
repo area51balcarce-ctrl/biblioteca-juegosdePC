@@ -656,10 +656,10 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
         ? 'https://www.gamestorrents.app/descarga/4b6f5ea887bb34b812708ae2e4f35023/'
         : null;
       const directDestination=knownDownload||verified;
-      link.href=directDestination||'https://www.gamestorrents.app/';
+      link.href=directDestination||'https://www.gamestorrents.app/buscar/?q='+encodeURIComponent(String(product.name||'').trim());
 
       link.textContent=directDestination?'🎮 IR A DESCARGA':'🔎 Buscar ficha';
-      link.title=directDestination?'Abrir página de descarga identificada':'Sin URL identificada: abrir buscador de GameStorrents';
+      link.title=directDestination?'Abrir página de descarga identificada':'Buscar este juego por nombre en GameStorrents';
       link.target='_blank';link.rel='noopener noreferrer';
       link.style.color='#aaff40';
       action.append(link);
@@ -690,7 +690,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
       downloadShortcut.textContent='⬇ DESCARGAR TORRENT';
       downloadShortcut.title=directDestination
         ? 'Abrir destino identificado para descarga manual'
-        : 'Sin URL exacta: abrir GameStorrents y buscar manualmente';
+        : 'Abrir la búsqueda del juego en GameStorrents para continuar manualmente';
       downloadShortcut.style.cssText='display:inline-block;background:#aaff40;color:#09130a;border-radius:4px;padding:6px 9px;margin:4px 0;font-size:11px;font-weight:bold;text-decoration:none;white-space:nowrap';
       action.append(downloadShortcut);
       for(const cell of [title,state,action]){cell.style.cssText='padding:10px;border-bottom:1px solid #36533c;vertical-align:top';tr.append(cell);}
