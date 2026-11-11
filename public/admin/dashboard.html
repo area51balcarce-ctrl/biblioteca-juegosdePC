@@ -665,8 +665,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
       link.title=directDestination?'Abrir página de descarga identificada':'Buscar este juego por nombre en GameStorrents';
       link.target='_blank';link.rel='noopener noreferrer';
       link.style.color='#aaff40';
-      action.append(link);
-      action.append(document.createTextNode(' · '));
+      // El modal muestra solamente el acceso principal.
       const register=document.createElement('button');
       register.type='button';
       register.textContent=stored?'✏️ Cambiar enlace':'🔗 Guardar enlace';
@@ -684,7 +683,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
           openPendingSearch();
         }catch(error){alert('Pegá una dirección HTTPS válida de una ficha de GameStorrents (/juegos-pc/...).');}
       });
-      action.append(register);
+      // Se conserva la lógica de registro sin mostrar su botón.
       // Acceso rapido adicional: nunca inicia una descarga sin intervencion del usuario.
       const downloadShortcut=document.createElement('a');
       downloadShortcut.href=directDestination||link.href;
