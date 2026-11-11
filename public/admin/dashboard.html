@@ -652,9 +652,12 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
         }catch(error){}
       }
       // URL comprobada visualmente para este titulo; sin inferir enlaces para otros juegos.
-      const knownDownload=String(product.name||'').trim().toLowerCase()==='another eden begins'
+      const gameName=String(product.name||'').trim().toLowerCase();
+      const knownDownload=gameName==='another eden begins'
         ? 'https://www.gamestorrents.app/descarga/4b6f5ea887bb34b812708ae2e4f35023/'
-        : null;
+        : gameName==='terminator: dark fate - defiance'
+          ? 'https://www.gamestorrents.app/descarga/9ba6502467c0fd6c2caaae712a453931/'
+          : null;
       const directDestination=knownDownload||verified;
       link.href=directDestination||'https://www.gamestorrents.app/buscar/?q='+encodeURIComponent(String(product.name||'').trim());
 
