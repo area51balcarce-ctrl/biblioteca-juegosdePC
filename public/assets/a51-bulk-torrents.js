@@ -12,6 +12,50 @@ const cleanFile=name=>{
  return normalize(base);
 };
 let candidates=[],busy=false;
+let authorizedDirectory=null,authorizedFiles=new Map(),cleanupCount=0,cleanupErrors=0;
+async function chooseAuthorizedFolder(){
+ if(busy)return;
+ if(typeof window.showDirectoryPicker!=='function'){
+  status('Edge no permite autorizar la carpeta. Actualizá el navegador.');return;
+ }
+ let directory;
+ try{directory=await window.showDirectoryPicker({id:'a51-torrent-cleanup',mode:'readwrite'});}
+ catch(error){if(error?.name!=='AbortError')status('Carpeta no autorizada: '+(error?.message||String(error)));return;}
+ const selected=[],handles=new Map();
+ try{
+  for await(const [name,handle] of directory.entries()){
+   if(handle.kind!=='file'||!name.toLowerCase().endsWith('.torrent'))continue;
+   const file=await handle.getFile();
+   selected.push(file);
+   handles.set(name,{handle,size:file.size,lastModified:file.lastModified});
+  }
+ }catch(error){status('Error leyendo carpeta: '+(error?.message||String(error)));return;}
+ authorizedDirectory=directory;authorizedFiles=handles;
+ $('a51-bulk-files').value='';
+ scan(selected);
+ status('Carpeta autorizada: '+directory.name+'. Solo se borrarán definitivamente los archivos que se suban correctamente.');
+}
+async function cleanupUploaded(item){
+ if(!authorizedDirectory)return '✓ Subido; sin borrado (selector tradicional)';
+ const snapshot=authorizedFiles.get(item.file.name);
+ if(!snapshot)return '✓ Subido; sin borrado (archivo no autorizado)';
+ try{
+  if((await authorizedDirectory.queryPermission({mode:'readwrite'}))!=='granted')
+   return '✓ Subido; sin borrado (falta permiso)';
+  const currentHandle=await authorizedDirectory.getFileHandle(item.file.name);
+  if(!(await currentHandle.isSameEntry(snapshot.handle)))return '✓ Subido; sin borrado (archivo diferente)';
+  const current=await currentHandle.getFile();
+  if(current.size!==snapshot.size||current.lastModified!==snapshot.lastModified)
+   return '✓ Subido; sin borrado (archivo modificado)';
+  await authorizedDirectory.removeEntry(item.file.name);
+  authorizedFiles.delete(item.file.name);
+  cleanupCount++;
+  return '✓ Subido y eliminado de la PC';
+ }catch(error){
+  cleanupErrors++;
+  return '✓ Subido; NO eliminado: '+(error?.message||String(error));
+ }
+}
 function status(message){$('a51-bulk-status').textContent=message;}
 function hide(){if(busy)return;$('a51-bulk-dialog').hidden=true;}
 function render(){
@@ -61,6 +105,7 @@ async function upload(){
  if(!confirm(`¿Subir ${ready.length} Torrents a sus juegos correspondientes? Solo se cargarán coincidencias exactas y sin archivo previo.`))return;
  busy=true;$('a51-bulk-upload').disabled=true;$('a51-bulk-cancel').disabled=true;
  let ok=0,errors=0;
+ cleanupCount=0;cleanupErrors=0;
  try{
   for(let i=0;i<ready.length;i++){
    const item=ready[i];
@@ -69,18 +114,32 @@ async function upload(){
     const result=await a51_syncProductFiles(item.product.id,{mainFile:item.file,prevMain:null});
     if(!result.ok)throw result.error||Error('Error al guardar');
     item.state='done';item.reason='✓ Subido';ok++;
+    item.reason=await cleanupUploaded(item);
    }catch(e){item.state='error';item.reason='Error: '+(e?.message||String(e));errors++;}
    render();
   }
   await loadProducts();
-  status(`Finalizado: ${ok} Torrents subidos; ${errors} errores. Los archivos sin coincidencia siguen pendientes.`);
+  status(`Finalizado: ${ok} subidos; ${cleanupCount} eliminados de la PC; ${errors} errores de subida; ${cleanupErrors} errores de limpieza. Los pendientes se conservan.`);
  }finally{busy=false;$('a51-bulk-cancel').disabled=false;$('a51-bulk-upload').disabled=true;}
 }
 function init(){
  const open=$('a51-bulk-open');if(!open)return;
  open.addEventListener('click',()=>{$('a51-bulk-dialog').hidden=false;});
  $('a51-bulk-cancel').addEventListener('click',hide);
- $('a51-bulk-files').addEventListener('change',e=>scan(e.target.files));
+ const picker=document.createElement('button');
+ picker.type='button';picker.className='btn';
+ picker.textContent='📂 Autorizar carpeta y escanear (limpieza automática)';
+ picker.style.cssText='display:block;margin:10px 0;border-color:#aaff40;color:#aaff40';
+ $('a51-bulk-files').insertAdjacentElement('beforebegin',picker);
+ const note=document.createElement('p');
+ note.textContent='Usá el botón de autorización para borrar definitivamente los .torrent subidos. El selector tradicional sigue disponible, pero no permite borrarlos.';
+ note.style.cssText='font-size:12px;color:#d7e7d9;margin:8px 0';
+ picker.insertAdjacentElement('afterend',note);
+ picker.addEventListener('click',chooseAuthorizedFolder);
+ $('a51-bulk-files').addEventListener('change',e=>{
+  authorizedDirectory=null;authorizedFiles=new Map();scan(e.target.files);
+  status('Selector tradicional: se subirán los archivos, pero NO se borrarán. Para limpieza automática usá Autorizar carpeta y escanear.');
+ });
  $('a51-bulk-upload').addEventListener('click',upload);
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
