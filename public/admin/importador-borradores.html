@@ -3,7 +3,7 @@ body{background:#0b0d0d;color:#eee;font-family:system-ui,sans-serif}main{max-wid
 body.a51-flujo-directo main>p:first-child,body.a51-flujo-directo main>p:nth-of-type(2),body.a51-flujo-directo main>p:nth-of-type(3){display:none}
 body.a51-flujo-directo #backup,body.a51-flujo-directo #restore,body.a51-flujo-directo #clear-backup,body.a51-flujo-directo #backup-status{display:none}
 .a51-return{display:inline-block;margin:0 0 14px;padding:9px 13px;border:1px solid #526d47;border-radius:7px;text-decoration:none}
-</style></head><body><main><p><a href="/admin/importador-lotes.html">← Volver a exploración</a></p><h1>📦 Revisión y publicación de fichas nuevas</h1><p><a href="/admin/importador-descargas.html">🧲 Abrir preparador de enlaces Torrent / Magnet</a></p><p class="muted">Podés autocompletar con IGDB/Steam y guardar el avance local sin crear productos. Completá una descripción propia o autorizada y seleccioná la base legal real. No se importan portadas, enlaces ni textos de GamesTorrents. Las fichas se publican únicamente tras confirmar la base legal y la autorización. Sin descargas automáticas.</p><p id="a51-return-row" hidden><a class="a51-return" href="/admin/dashboard.html">← Volver al panel de administración</a></p><section class="panel"><p><button id="auto" type="button">⚡ Autocompletar con IGDB</button> <button id="halt" type="button" disabled>Detener</button></p><p id="auto-status" class="muted" aria-live="polite"></p><p><button id="backup" type="button">💾 Guardar avance local</button> <button id="restore" type="button">↩️ Recuperar avance</button> <button id="clear-backup" type="button">🗑️ Borrar respaldo</button></p><p id="backup-status" class="muted" aria-live="polite"></p><div style="border:1px solid #526c42;padding:14px;border-radius:8px;margin:14px 0"><label for="bulk-legal">⚖️ Base legal para todo el lote</label><select id="bulk-legal"><option value="">Elegir para las fichas seleccionadas</option><option value="freeware">Freeware</option><option value="shareware">Shareware</option><option value="dominio-publico">Dominio público / licencia libre</option><option value="reventa">Licencia de reventa</option><option value="propio">Contenido propio</option></select><p><label><input id="legal-confirm" type="checkbox"> Confirmo que tengo autorización para publicar las fichas seleccionadas y, cuando corresponda, distribuir sus archivos. La selección de una categoría no acredita por sí sola una licencia.</label></p></div><div id="items"></div><p><button id="save" disabled>💾 Publicar seleccionados con portada automática</button></p><p id="status" class="status muted" aria-live="polite"></p></section></main>
+</style></head><body><main><p><a href="/admin/importador-lotes.html">← Volver a exploración</a></p><h1>📦 Revisión y publicación de fichas nuevas</h1><p><a href="/admin/importador-descargas.html">🧲 Abrir preparador de enlaces Torrent / Magnet</a></p><p class="muted">Podés autocompletar con IGDB/Steam y guardar el avance local sin crear productos. Completá una descripción propia o autorizada y seleccioná la base legal real. No se importan portadas, enlaces ni textos de GamesTorrents. Las fichas se publican únicamente tras confirmar la base legal y la autorización. Sin descargas automáticas.</p><p id="a51-return-row" hidden><a class="a51-return" href="/admin/dashboard.html">← Volver al panel de administración</a></p><section class="panel"><p><button id="auto" type="button">⚡ Autocompletar con IGDB</button> <button id="halt" type="button" disabled>Detener</button></p><p id="auto-status" class="muted" aria-live="polite"></p><p><button id="backup" type="button">💾 Guardar avance local</button> <button id="restore" type="button">↩️ Recuperar avance</button> <button id="clear-backup" type="button">🗑️ Borrar respaldo</button></p><p id="backup-status" class="muted" aria-live="polite"></p><div style="border:1px solid #526c42;padding:14px;border-radius:8px;margin:14px 0"><label for="bulk-legal">⚖️ Base legal para todo el lote</label><select id="bulk-legal"><option value="">Elegir para las fichas seleccionadas</option><option value="freeware">Freeware</option><option value="shareware">Shareware</option><option value="dominio-publico">Dominio público / licencia libre</option><option value="reventa">Licencia de reventa</option><option value="propio">Contenido propio</option></select><p><label><input id="legal-confirm" type="checkbox"> Confirmo que tengo autorización para publicar las fichas seleccionadas y, cuando corresponda, distribuir sus archivos. La selección de una categoría no acredita por sí sola una licencia.</label></p></div><div id="items"></div><p><button id="save" disabled>💾 Publicar seleccionados con portada</button></p><p id="status" class="status muted" aria-live="polite"></p></section></main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script><script src="../assets/config.js"></script><script src="../assets/store.js"></script><script>
 (async()=>{if(!await a51_requireSession())return;
 const $=id=>document.getElementById(id),root=$('items'),status=$('status'),save=$('save');let halt=false,busy=false;
@@ -23,6 +23,21 @@ for(const [i,item] of rows.entries()){
  const matches=document.createElement('select');matches.hidden=true;section.append(matches);
  const apply=document.createElement('button');apply.type='button';apply.textContent='✓ Aplicar ficha seleccionada';apply.hidden=true;section.append(apply);
  const coverPreview=document.createElement('div');coverPreview.className='muted';section.append(coverPreview);
+ const manualLabel=document.createElement('label');manualLabel.textContent='📁 Cargar portada manual desde mi PC';
+ const manualCover=document.createElement('input');manualCover.type='file';manualCover.accept='image/png,image/jpeg,image/webp';
+ manualCover.style.cssText='display:block;margin:8px 0;width:100%';manualLabel.append(manualCover);section.append(manualLabel);
+ const manualPreview=document.createElement('div');manualPreview.className='muted';section.append(manualPreview);
+ let manualPreviewUrl=null;
+ manualCover.addEventListener('change',()=>{
+  const file=manualCover.files?.[0]||null;
+  if(manualPreviewUrl){URL.revokeObjectURL(manualPreviewUrl);manualPreviewUrl=null;}
+  manualPreview.replaceChildren();item.manualCoverFile=null;
+  if(!file)return;
+  if(!['image/png','image/jpeg','image/webp'].includes(file.type)){manualCover.value='';manualPreview.textContent='Formato no admitido. Usá JPG, PNG o WEBP.';return;}
+  item.manualCoverFile=file;manualPreviewUrl=URL.createObjectURL(file);
+  const img=document.createElement('img');img.src=manualPreviewUrl;img.alt='Portada manual seleccionada';img.style.cssText='max-width:125px;max-height:190px;display:block;margin:10px 0';manualPreview.append(img);
+  const note=document.createElement('small');note.textContent='✓ Portada manual lista para publicar (prioridad sobre IGDB).';manualPreview.append(note);
+ });
  const feedback=document.createElement('p');feedback.className='muted';section.append(feedback);
  const description=document.createElement('textarea');description.placeholder='Redactá una descripción propia o pegá una autorizada (opcional)';label('Descripción',description);
  const tags=document.createElement('input');tags.type='text';label('Géneros / etiquetas',tags);
@@ -61,24 +76,24 @@ save.addEventListener('click',async()=>{let selected=rows.filter(x=>x.controls.c
 if(selected.some(x=>!x.controls.name.value.trim()||!x.controls.legal.value)){status.textContent='Completá nombre y base legal de cada ficha seleccionada.';return;}
 const names=selected.map(x=>x.controls.name.value.trim());const slugs=names.map(a51_slugify);if(new Set(slugs).size!==slugs.length){status.textContent='Hay nombres duplicados dentro de la selección.';return;}
 if(!$('legal-confirm').checked){status.textContent='Confirmá la autorización de publicación antes de continuar.';return;}
-const missingCovers=selected.filter(x=>!x.coverUrl);
+const missingCovers=selected.filter(x=>!x.manualCoverFile&&!x.coverUrl);
 if(missingCovers.length){
  const names=missingCovers.map(x=>x.controls.name.value.trim()||x.name);
- const valid=selected.filter(x=>!!x.coverUrl);
+ const valid=selected.filter(x=>!!x.manualCoverFile||!!x.coverUrl);
  if(!valid.length){
-  status.textContent='Ninguna ficha seleccionada tiene portada automática registrada. Buscá y aplicá una portada desde IGDB antes de publicar. Fichas pendientes: '+names.join(', ');
+  status.textContent='Ninguna ficha seleccionada tiene portada. Buscá una con IGDB o cargá una imagen desde tu PC antes de publicar. Fichas pendientes: '+names.join(', ');
   return;
  }
  if(!confirm('Hay '+missingCovers.length+' ficha(s) sin portada: '+names.join(', ')+'.\\n\\n¿Publicar las '+valid.length+' fichas completas y dejar las que no tienen portada pendientes para revisar?')){status.textContent='Publicación cancelada. Podés corregir las portadas o desmarcar las fichas pendientes.';return;}
- for(const item of missingCovers){item.controls.check.checked=false;item.controls.result.textContent='Pendiente: falta portada automática. No se publicará esta ficha.';}
+ for(const item of missingCovers){item.controls.check.checked=false;item.controls.result.textContent='Pendiente: falta portada. No se publicará esta ficha.';}
  selected=valid;
  status.textContent='Se excluyeron '+missingCovers.length+' fichas sin portada. Se publicarán solo las '+selected.length+' fichas completas.';
 }
-if(!confirm('Se publicarán '+selected.length+' fichas con portada automática y SIN enlaces de descarga. ¿Confirmás que tenés autorización?'))return;
+if(!confirm('Se publicarán '+selected.length+' fichas con portada seleccionada y SIN enlaces de descarga. ¿Confirmás que tenés autorización?'))return;
 save.disabled=true;let success=0,failed=0;
 for(const item of selected){const c=item.controls;try{
  const slug=a51_slugify(c.name.value);const {data:existing,error:checkError}=await A51_CLIENT.from('products').select('id').eq('slug',slug).limit(1);if(checkError)throw checkError;if(existing.length){c.result.textContent='Omitido: ya existe en el catálogo.';failed++;continue;}
- const coverFile=await a51_prepareRemoteCover(item.coverUrl,c.name.value.trim());if(!coverFile)throw Error('Portada no disponible');
+ const coverFile=item.manualCoverFile||await a51_prepareRemoteCover(item.coverUrl,c.name.value.trim());if(!coverFile)throw Error('Portada no disponible');
  const result=await a51_upsertProduct({name:c.name.value.trim(),slug,description:c.description.value.trim(),category:'Juego de PC',tags:c.tags.value.trim(),reqMin:c.reqMin.value.trim(),reqRec:c.reqRec.value.trim(),size:c.size.value.trim(),languages:c.languages.value.trim(),legalBasis:c.legal.value,status:'ok',coverFile,downloads:[]});
  if(!result.ok)throw result.error||Error('No se pudo guardar');
  // Guardar solo la URL real de origen, cuando sea una ficha valida de GameStorrents.
