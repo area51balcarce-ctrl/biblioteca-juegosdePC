@@ -59,6 +59,14 @@ window.addEventListener('message',event=>{
  const done=(q.items||[]).filter(x=>x.status==='done').length;
  const failed=(q.items||[]).filter(x=>x.status==='failed').length;
  state.textContent=(q.running?(q.paused?'⏸ Pausada':'🔄 En curso'):'Lista / detenida')+' · '+done+' completados · '+failed+' errores · '+(q.items||[]).length+' totales'+(q.current>=0?' · Juego '+(q.current+1):'');
+ for(const tr of tbody.querySelectorAll('tr')){
+  if(!tr.querySelector('.a51-tq-check'))continue;
+  const name=tr.cells[1]?.textContent?.trim();
+  const item=(q.items||[]).find(x=>x.name===name);
+  let tag=tr.querySelector('[data-a51-tq-progress]');
+  if(!tag){tag=document.createElement('div');tag.dataset.a51TqProgress='1';tag.style.cssText='font-weight:bold;margin-top:5px;color:#aaff40';tr.cells[2].append(tag);}
+  tag.textContent=item?({pending:'⏳ En espera',running:'🔄 Procesando',done:'✅ Descargado',failed:'⚠ Error: '+(item.reason||'revisar'),stopped:'⏹ Detenido'}[item.status]||''):' ';
+ }
 });
 setInterval(()=>{if(!modal.hidden)send('STATUS')},2500);
 })();
