@@ -409,6 +409,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
     <p id="a51-torrent-name"></p>
     <label for="a51-torrent-file">Seleccionar archivo .torrent</label>
     <input id="a51-torrent-file" type="file" accept=".torrent" style="display:block;width:100%;margin:12px 0">
+    <div id="a51-manual-torrent-cleanup"></div>
     <p id="a51-torrent-status" aria-live="polite"></p>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button type="button" id="a51-torrent-save" class="btn btn-primary" onclick="saveTorrentQuick()">💾 Guardar Torrent</button>
@@ -593,6 +594,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
     document.getElementById('a51-torrent-name').textContent=product.name;
     document.getElementById('a51-torrent-file').value='';
     document.getElementById('a51-torrent-status').textContent='';
+    window.A51ManualTorrentCleanup?.onOpen();
     dialog.hidden=false;
   }
   function closeTorrentQuick(){
@@ -614,6 +616,8 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
       const result=await a51_syncProductFiles(product.id,{mainFile:file,prevMain:product.files?.main||null});
       if(!result.ok)throw result.error||new Error('No se pudo guardar el archivo');
       status.textContent='✓ Torrent guardado correctamente.';
+      const cleanupNote=await window.A51ManualTorrentCleanup?.afterUpload(file);
+      if(cleanupNote)status.textContent+=' '+cleanupNote;
       document.getElementById('a51-torrent-dialog').hidden=true;
       quickTorrentProductId=null;
       await loadProducts();
@@ -1005,6 +1009,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden}
   })();
 </script>
 <script src="/assets/a51-bulk-torrents.js" defer></script>
+<script src="/assets/a51-manual-torrent-cleanup.js" defer></script>
 <script src="/assets/a51-torrent-queue.js" defer></script>
 <script src="/assets/notifications.js" defer></script>
 </body>
