@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Control de calidad — AREA 51</title>
+<link rel="icon" type="image/png" sizes="128x128" href="/assets/area51-admin-favicon.png?v=1">
+<link rel="stylesheet" href="/assets/style.css">
+<style>
+*{box-sizing:border-box}body{margin:0;background:#090f0e;color:#eaf7f1;font-family:system-ui,Arial,sans-serif}main{max-width:1250px;margin:auto;padding:30px 20px 70px}a{color:#b4ff68}h1{margin:12px 0 5px}p{color:#a9c3b8}.header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.panel{background:#111d19;border:1px solid #2c4c3d;border-radius:14px;padding:18px;margin-top:18px}.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px}.stat{background:#182820;border:1px solid #315341;border-radius:12px;padding:15px}.stat strong{display:block;font-size:26px;color:#b4ff68}.stat span{font-size:12px;color:#c4d5ce}.controls{display:flex;gap:10px;flex-wrap:wrap}input,select,button{font:inherit;padding:10px;border-radius:8px;border:1px solid #426451;background:#101a16;color:#eaf7f1}input{min-width:220px;flex:1}button,.action{cursor:pointer}.action{display:inline-block;text-decoration:none;border:1px solid #83db7b;border-radius:8px;padding:7px 11px;white-space:nowrap}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;text-align:left}th,td{padding:12px 9px;border-bottom:1px solid #294337;vertical-align:top}th{font-size:12px;color:#b2cbbb}td{font-size:13px}.tags{display:flex;flex-wrap:wrap;gap:5px}.tag{border:1px solid #886b35;color:#ffda94;border-radius:6px;padding:3px 6px;font-size:11px}.tag.critical{border-color:#a94f4f;color:#ffb3b3}.ok{color:#a7efaa}.muted{color:#9bb1a7}.hidden{display:none!important}@media(max-width:600px){main{padding:18px 12px}h1{font-size:24px}}
+</style>
+</head>
+<body>
+<main>
+<div class="header"><a href="/admin/dashboard.html">← Volver al catálogo</a><span class="muted">🛡️ AREA 51 · Diagnóstico de solo lectura</span></div>
+<h1>🛡️ Centro de control de calidad</h1>
+<p>Revisá las fichas y abrí el editor existente para corregirlas. Esta herramienta no guarda, elimina ni modifica productos.</p>
+<div id="a51-qc-status" class="panel" role="status" aria-live="polite">Comprobando sesión…</div>
+<div id="a51-qc-app" class="hidden">
+<div class="stats panel" id="a51-qc-stats"></div>
+<div class="panel controls">
+<input id="a51-qc-search" type="search" placeholder="Buscar juego…" aria-label="Buscar juego">
+<select id="a51-qc-state" aria-label="Estado"><option value="all">Todos los estados</option><option value="ok">Publicados</option><option value="draft">Borradores</option></select>
+<select id="a51-qc-issue" aria-label="Control de calidad"><option value="all">Todos los juegos</option><option value="issues">Con observaciones</option><option value="clean">Sin observaciones</option><option value="cover">Sin portada</option><option value="description">Sin descripción</option><option value="requirements">Sin requisitos</option><option value="category">Sin categoría</option><option value="identity">Sin nombre o enlace</option><option value="duplicate">Posibles duplicados</option></select>
+<button id="a51-qc-refresh" type="button">↻ Actualizar</button>
+</div>
+<div class="panel"><p id="a51-qc-count" class="muted"></p><div class="table-wrap"><table><thead><tr><th>Juego</th><th>Estado</th><th>Observaciones</th><th>Acción</th></tr></thead><tbody id="a51-qc-rows"></tbody></table></div></div>
+<p class="muted">Los duplicados son coincidencias sugeridas, no confirmadas. La falta de requisitos recomendados es una advertencia informativa. La portada se verifica por su ruta registrada, no por disponibilidad del archivo.</p>
+</div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="/assets/config.js"></script>
+<script src="/assets/store.js"></script>
+<script src="/assets/a51-control-calidad.js"></script>
+</body></html>
