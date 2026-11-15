@@ -21,7 +21,7 @@ function render(){
    (manual?'<small>Se usará tu texto manual en lugar del automático.</small>':'')+'</div>';
   }).join('');
   const options=r.searchResults.length?'<label>Coincidencia IGDB <select data-match="'+i+'"><option value="">Elegí un resultado para consultar sus datos</option>'+r.searchResults.map(x=>'<option value="'+esc(x.id)+'" '+(r.match===String(x.id)?'selected':'')+'>'+esc(x.name)+' ('+esc(x.released||'sin fecha')+')</option>').join('')+'</select></label><button data-detail="'+i+'">Consultar coincidencia elegida</button>':'';
-  return '<div class="entry"><div class="bar"><label class="name"><input type="checkbox" data-row="'+i+'" '+(r.enabled?'checked':'')+'>'+esc(p.name)+'</label><small>'+esc(p.status==='ok'?'Publicado':'Borrador')+'</small><a href="/admin/editor?slug='+encodeURIComponent(p.slug||'')+'" target="_blank" rel="noopener">Abrir editor</a></div>'+(r.error?'<p class="danger">'+esc(r.error)+'</p>':'')+(r.proposed?'<p class="good">✓ Datos encontrados. Revisá y marcá los campos que quieras guardar.</p>':'')+options+(fieldsHtml?'<details open><summary>📝 Campos faltantes · automáticos o manuales ('+r.selected.size+' seleccionados)</summary><div>'+fieldsHtml+'</div></details>':'<p class="good">No hay campos pendientes en esta ficha.</p>')+'</div>';
+  return '<div class="entry"><div class="bar"><label class="name"><input type="checkbox" data-row="'+i+'" '+(r.enabled?'checked':'')+'>'+esc(p.name)+'</label><small>'+esc(p.status==='ok'?'Publicado':'Borrador')+'</small><a href="/admin/editor?slug='+encodeURIComponent(p.slug||'')+'" target="_blank" rel="noopener">Abrir editor</a><button type="button" data-auto="'+i+'" '+(running?'disabled':'')+'>🤖 Autocompletar este juego</button></div>'+(r.error?'<p class="danger">'+esc(r.error)+'</p>':'')+(r.proposed?'<p class="good">✓ Datos encontrados. Revisá y marcá los campos que quieras guardar.</p>':'')+options+(fieldsHtml?'<details open><summary>📝 Campos faltantes · automáticos o manuales ('+r.selected.size+' seleccionados)</summary><div>'+fieldsHtml+'</div></details>':'<p class="good">No hay campos pendientes en esta ficha.</p>')+'</div>';
  }).join('');
  $('a51-enrich-search').disabled=running||!rows.length;
  $('a51-enrich-save').disabled=running||!rows.some(r=>hasApproved(r));
@@ -62,6 +62,30 @@ async function search(){
   render();
  }
  running=false;status('✓ Búsqueda terminada. Confirmá cada coincidencia y consultá los detalles.');render();
+}
+async function autoOne(i){
+ const r=rows[i];if(!r||running)return;
+ running=true;render();status('🤖 Buscando datos para '+r.raw.name+'…');
+ try{
+  const response=await fetch('/api/igdb-data-v2?q='+encodeURIComponent(r.raw.name));
+  const data=await response.json();if(!response.ok)throw Error(data.error||'Error de búsqueda');
+  r.searchResults=(data.results||[]).filter(x=>x.id&&x.name).slice(0,10);
+  const exact=r.searchResults.filter(x=>norm(x.name)===norm(r.raw.name));
+  r.match=null;r.proposed=null;r.selected.clear();
+  if(exact.length!==1){
+   r.error=exact.length>1?'Hay varias coincidencias exactas. Elegí una manualmente.':r.searchResults.length?'No hay coincidencia exacta. Elegí el juego correcto en la lista.':'No se encontraron resultados. Podés usar la carga manual.';
+   status('Búsqueda finalizada. '+r.error);return;
+  }
+  r.match=String(exact[0].id);
+  status('🤖 Consultando requisitos y descripción de '+r.raw.name+'…');
+  const detailResponse=await fetch('/api/igdb-data-v2?id='+encodeURIComponent(r.match));
+  const detailData=await detailResponse.json();if(!detailResponse.ok)throw Error(detailData.error||'Error de detalles');
+  if(!detailData.product?.name||norm(detailData.product.name)!==norm(exact[0].name))throw Error('La respuesta no coincide con el juego elegido');
+  r.proposed=detailData.product;
+  r.error=detailData.product.updateMeta?.hasSteamData?'':'IGDB encontró el juego, pero Steam no aportó datos adicionales.';
+  status('✓ Vista previa automática lista para '+r.raw.name+'. Marcá los campos que quieras guardar.');
+ }catch(e){r.error='No se pudo autocompletar: '+e.message;status('⚠ '+r.error);}
+ finally{running=false;render();}
 }
 async function detail(i){
  const r=rows[i];if(!r||!r.match||running)return;running=true;render();status('Consultando IGDB + Steam: '+r.raw.name);
@@ -134,7 +158,7 @@ async function init(){
    if(checkbox){checkbox.disabled=!proposedValue(r,col,fields.find(f=>f[0]===col)[2]);if(checkbox.disabled){checkbox.checked=false;r.selected.delete(col);}}
    $('a51-enrich-save').disabled=running||!rows.some(x=>hasApproved(x));
   });
-  $('a51-enrich-list').addEventListener('click',e=>{const b=e.target.closest('[data-detail]');if(b)detail(Number(b.dataset.detail));});
+  $('a51-enrich-list').addEventListener('click',e=>{const auto=e.target.closest('[data-auto]');if(auto){autoOne(Number(auto.dataset.auto));return;}const b=e.target.closest('[data-detail]');if(b)detail(Number(b.dataset.detail));});
   status('Listo. Cargá un lote de fichas incompletas.');
  }catch(e){console.error(e);status('No se pudo iniciar el módulo.');}
 }
