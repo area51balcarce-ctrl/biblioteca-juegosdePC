@@ -1,0 +1,124 @@
+/* AREA 51 — Enriquecimiento por lotes v1.0. Guardado selectivo con control de concurrencia. */
+(()=>{'use strict';
+const $=id=>document.getElementById(id),clean=x=>String(x??'').trim(),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm=x=>clean(x).toLocaleLowerCase('es-AR').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');
+const fields=[['description','Descripción','description'],['req_min','Requisitos mínimos','reqMin'],['req_rec','Requisitos recomendados','reqRec'],['size','Espacio requerido','size'],['languages','Idiomas','languages']];
+let rows=[],running=false;
+const status=t=>$('a51-enrich-status').textContent=t;
+function incomplete(r){return fields.some(([col])=>!clean(r[col]));}
+function candidate(r){return {raw:r,match:null,proposed:null,selected:new Set(),error:'',searchResults:[],busy:false};}
+function render(){
+ $('a51-enrich-count').textContent=rows.length+' fichas cargadas · '+rows.filter(r=>r.proposed).length+' con vista previa';
+ $('a51-enrich-list').innerHTML=rows.map((r,i)=>{
+  const p=r.raw;
+  const fieldsHtml=r.proposed?fields.filter(([col,,key])=>!clean(p[col])&&clean(r.proposed[key])).map(([col,label,key])=>'<div class="field"><label><input type="checkbox" data-i="'+i+'" data-col="'+esc(col)+'" '+(r.selected.has(col)?'checked':'')+'> <b>'+esc(label)+'</b></label><div class="new">'+esc(r.proposed[key])+'</div></div>').join(''):'';
+  const options=r.searchResults.length?'<label>Coincidencia IGDB <select data-match="'+i+'"><option value="">Elegí un resultado para consultar sus datos</option>'+r.searchResults.map(x=>'<option value="'+esc(x.id)+'" '+(r.match===String(x.id)?'selected':'')+'>'+esc(x.name)+' ('+esc(x.released||'sin fecha')+')</option>').join('')+'</select></label><button data-detail="'+i+'">Consultar coincidencia elegida</button>':'';
+  return '<div class="entry"><div class="bar"><label class="name"><input type="checkbox" data-row="'+i+'" '+(r.enabled?'checked':'')+'>'+esc(p.name)+'</label><small>'+esc(p.status==='ok'?'Publicado':'Borrador')+'</small><a href="/admin/editor?slug='+encodeURIComponent(p.slug||'')+'" target="_blank" rel="noopener">Abrir editor</a></div>'+(r.error?'<p class="danger">'+esc(r.error)+'</p>':'')+(r.proposed?'<p class="good">✓ Vista previa disponible. Seleccioná solamente los campos que quieras guardar.</p>':'')+options+(fieldsHtml?'<details open><summary>Campos disponibles ('+r.selected.size+' seleccionados)</summary><div class="preview">'+fieldsHtml+'</div></details>':'')+'</div>';
+ }).join('');
+ $('a51-enrich-search').disabled=running||!rows.length;
+ $('a51-enrich-save').disabled=running||!rows.some(r=>r.proposed&&r.selected.size);
+}
+async function load(){
+ if(running)return;running=true;rows=[];render();status('Cargando fichas incompletas…');
+ try{
+  const limit=Number($('a51-enrich-limit').value),pageSize=500;let offset=0,found=[];
+  while(found.length<limit){
+   const {data,error}=await A51_CLIENT.from('products').select('id,slug,name,status,description,req_min,req_rec,size,languages,updated_at').order('name').range(offset,offset+pageSize-1);
+   if(error)throw error;
+   found.push(...(data||[]).filter(r=>clean(r.name)&&clean(r.slug)&&incomplete(r)));
+   if(!data||data.length<pageSize)break;
+   offset+=pageSize;
+  }
+  rows=found.slice(0,limit).map(candidate);
+  status(rows.length?'✓ Fichas cargadas. Seleccioná los juegos que querés consultar.':'No se encontraron fichas incompletas.');
+ }catch(e){console.error(e);status('⚠ Error consultando productos. No se modificó ningún dato.');}
+ finally{running=false;render();}
+}
+async function search(){
+ if(running)return;running=true;render();
+ for(let i=0;i<rows.length;i++){
+  const r=rows[i];if(!r.enabled)continue;
+  status('Consultando IGDB '+(i+1)+'/'+rows.length+': '+r.raw.name);
+  try{
+   const response=await fetch('/api/igdb-data-v2?q='+encodeURIComponent(r.raw.name));
+   const data=await response.json();if(!response.ok)throw Error(data.error||'Error de búsqueda');
+   r.searchResults=(data.results||[]).filter(x=>x.id&&x.name).slice(0,10);
+   r.match=null;r.proposed=null;r.selected.clear();
+   if(!r.searchResults.length)r.error='Sin coincidencias. Conservamos la ficha sin cambios.';
+   else{
+    const exact=r.searchResults.filter(x=>norm(x.name)===norm(r.raw.name));
+    if(exact.length===1){r.match=String(exact[0].id);r.error='Coincidencia exacta sugerida. Confirmá el juego antes de consultar detalles.';}
+    else r.error='Revisá las coincidencias: no se eligió ninguna automáticamente.';
+   }
+  }catch(e){r.error='Error de búsqueda: '+e.message;r.searchResults=[];}
+  render();
+ }
+ running=false;status('✓ Búsqueda terminada. Confirmá cada coincidencia y consultá los detalles.');render();
+}
+async function detail(i){
+ const r=rows[i];if(!r||!r.match||running)return;running=true;render();status('Consultando IGDB + Steam: '+r.raw.name);
+ try{
+  const response=await fetch('/api/igdb-data-v2?id='+encodeURIComponent(r.match));
+  const data=await response.json();if(!response.ok)throw Error(data.error||'Error de detalles');
+  if(!data.product?.name)throw Error('Respuesta sin nombre');
+  const selected=r.searchResults.find(x=>String(x.id)===r.match);
+  if(!selected||norm(data.product.name)!==norm(selected.name))throw Error('El resultado no coincide con la selección');
+  r.proposed=data.product;r.selected.clear();r.error='';
+  if(!data.product.updateMeta?.hasSteamData)r.error='IGDB respondió, pero Steam no aportó datos. Revisá la información disponible.';
+ }catch(e){r.proposed=null;r.error='No se pudo obtener la ficha: '+e.message;}
+ finally{running=false;status('Revisión lista. Marcá solo los campos que aprobás.');render();}
+}
+async function save(){
+ if(running)return;
+ const selected=rows.filter(r=>r.proposed&&r.selected.size);if(!selected.length)return;
+ const count=selected.reduce((n,r)=>n+r.selected.size,0);
+ if(!confirm('¿Guardar '+count+' campos aprobados en '+selected.length+' juegos? Se verificarán nuevamente los valores antes de cada escritura.'))return;
+ running=true;render();let ok=0,skipped=0,errors=0;
+ for(const r of selected){
+  status('Guardando '+r.raw.name+'…');
+  try{
+   const {data:latest,error:readError}=await A51_CLIENT.from('products').select('id,updated_at,description,req_min,req_rec,size,languages').eq('id',r.raw.id).single();
+   if(readError)throw readError;
+   // Nunca pisar información existente o una ficha modificada desde la vista previa.
+   if(latest.updated_at!==r.raw.updated_at){skipped++;r.error='Ficha modificada desde la carga. Actualizá el lote.';continue;}
+   const payload={};const guards=[];
+   for(const [col,,key] of fields){
+    if(!r.selected.has(col))continue;
+    const proposed=clean(r.proposed[key]);
+    if(!proposed||clean(latest[col])||clean(r.raw[col]))continue;
+    payload[col]=proposed;guards.push([col,latest[col]]);
+   }
+   if(!Object.keys(payload).length){skipped++;r.error='Los campos seleccionados ya no están vacíos.';continue;}
+   let query=A51_CLIENT.from('products').update(payload).eq('id',r.raw.id).eq('updated_at',r.raw.updated_at);
+   for(const [col,value] of guards)query=value===null?query.is(col,null):query.eq(col,value);
+   const {data:updated,error}=await query.select('id,updated_at').maybeSingle();
+   if(error)throw error;
+   if(!updated){skipped++;r.error='Conflicto de datos: no se guardó. Recargá la ficha.';continue;}
+   Object.assign(r.raw,payload);r.raw.updated_at=updated.updated_at;r.selected.clear();ok++;r.error='';
+  }catch(e){errors++;r.error='No se pudo guardar: '+e.message;console.error('Enriquecimiento',e);}
+  render();
+ }
+ running=false;status('Finalizado: '+ok+' juegos actualizados · '+skipped+' omitidos por seguridad · '+errors+' errores. No se sobrescribieron campos completos.');render();
+}
+async function init(){
+ try{
+  const session=await a51_requireSession();if(!session)return;
+  const admin=await a51_getCurrentAdmin();if(!admin||admin.role!=='admin'){status('Acceso exclusivo para administradores.');return;}
+  $('a51-enrich-app').classList.remove('hidden');
+  $('a51-enrich-load').addEventListener('click',load);
+  $('a51-enrich-search').addEventListener('click',search);
+  $('a51-enrich-save').addEventListener('click',save);
+  $('a51-enrich-list').addEventListener('change',e=>{
+   const t=e.target,i=Number(t.dataset.i??t.dataset.row??t.dataset.match);
+   if(!Number.isInteger(i)||!rows[i])return;
+   if(t.hasAttribute('data-row'))rows[i].enabled=t.checked;
+   else if(t.hasAttribute('data-i')){if(t.checked)rows[i].selected.add(t.dataset.col);else rows[i].selected.delete(t.dataset.col);}
+   else if(t.hasAttribute('data-match')){rows[i].match=t.value;rows[i].proposed=null;rows[i].selected.clear();}
+   render();
+  });
+  $('a51-enrich-list').addEventListener('click',e=>{const b=e.target.closest('[data-detail]');if(b)detail(Number(b.dataset.detail));});
+  status('Listo. Cargá un lote de fichas incompletas.');
+ }catch(e){console.error(e);status('No se pudo iniciar el módulo.');}
+}
+init();
+})();
