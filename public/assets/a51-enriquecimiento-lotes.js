@@ -6,7 +6,7 @@ const fields=[['description','Descripción','description'],['req_min','Requisito
 let rows=[],running=false;
 const status=t=>$('a51-enrich-status').textContent=t;
 function incomplete(r){return fields.some(([col])=>!clean(r[col]));}
-function candidate(r){return {raw:r,match:null,proposed:null,manual:{},selected:new Set(),error:'',searchResults:[],busy:false,enabled:true};}
+function candidate(r){return {raw:r,match:null,proposed:null,manual:{},secondary:null,selected:new Set(),error:'',searchResults:[],busy:false,enabled:true};}
 function proposedValue(r,col,key){return clean(r.manual[col])||clean(r.proposed?.[key]);}
 function hasApproved(r){return [...r.selected].some(col=>{const f=fields.find(x=>x[0]===col);return f&&!clean(r.raw[col])&&proposedValue(r,col,f[2]);});}
 function render(){
@@ -16,7 +16,7 @@ function render(){
   const fieldsHtml=fields.filter(([col])=>!clean(p[col])).map(([col,label,key])=>{
    const automatic=clean(r.proposed?.[key]),manual=clean(r.manual[col]),value=manual||automatic;
    return '<div class="field"><label><input type="checkbox" data-i="'+i+'" data-col="'+esc(col)+'" '+(r.selected.has(col)?'checked':'')+' '+(!value?'disabled':'')+'> <b>'+esc(label)+'</b></label>'+
-   (automatic?'<div class="new">🤖 IGDB/Steam: '+esc(automatic)+'</div>':'<div class="muted">Sin dato automático disponible.</div>')+
+   (automatic?'<div class="new">🤖 '+esc(col==='size'&&r.secondary?.verified?'GOG (fuente secundaria)':'IGDB/Steam')+': '+esc(automatic)+'</div>':'<div class="muted">Sin dato automático disponible.</div>')+
    '<label style="display:block;margin-top:8px">✍️ Carga manual (opcional)<textarea data-manual="'+i+'" data-field="'+esc(col)+'" rows="3" style="display:block;width:100%;margin-top:5px;resize:vertical" placeholder="Escribí el dato para esta ficha…">'+esc(r.manual[col]||'')+'</textarea></label>'+
    (manual?'<small>Se usará tu texto manual en lugar del automático.</small>':'')+'</div>';
   }).join('');
@@ -24,8 +24,9 @@ function render(){
   const automaticAvailable=missing.filter(([col,,key])=>clean(r.proposed?.[key]));
   const manualAvailable=missing.filter(([col])=>clean(r.manual[col]));
   const feedback=r.proposed?'<div class="field" style="border-color:#6cbf85;background:#173022"><strong>🤖 Resultado de la consulta</strong><p class="good">🟢 '+automaticAvailable.length+' campos encontrados automáticamente: '+esc(automaticAvailable.map(x=>x[1]).join(', ')||'ninguno')+'</p><p class="muted">🟡 '+(missing.length-automaticAvailable.length)+' campos sin datos automáticos: '+esc(missing.filter(([col,,key])=>!clean(r.proposed?.[key])).map(x=>x[1]).join(', ')||'ninguno')+'</p><p>💾 '+r.selected.size+' campos marcados para guardar · ✍️ '+manualAvailable.length+' con texto manual</p></div>':r.searchResults.length?'<p class="muted">🔎 Resultados encontrados. Elegí una coincidencia y consultá sus detalles para ver los campos.</p>':'<p class="muted">⏳ Todavía no hay datos automáticos consultados para este juego.</p>';
+  const storageLookup=!clean(p.size)?'<div class="bar" style="margin:9px 0"><button type="button" data-storage="'+i+'" '+(running?'disabled':'')+'>💾 Buscar espacio requerido en GOG</button>'+(r.secondary?'<span class="'+(r.secondary.verified?'good':'muted')+'">'+esc(r.secondary.verified?'Encontrado: '+r.secondary.size+' · GOG':r.secondary.reason||'Sin datos verificables')+'</span>':'')+(r.secondary?.verified&&r.secondary.sourceUrl?'<a href="'+esc(r.secondary.sourceUrl)+'" target="_blank" rel="noopener noreferrer">Ver fuente</a>':'')+'</div>':'';
   const options=r.searchResults.length?'<label>Coincidencia IGDB <select data-match="'+i+'"><option value="">Elegí un resultado para consultar sus datos</option>'+r.searchResults.map(x=>'<option value="'+esc(x.id)+'" '+(r.match===String(x.id)?'selected':'')+'>'+esc(x.name)+' ('+esc(x.released||'sin fecha')+')</option>').join('')+'</select></label><button data-detail="'+i+'">Consultar coincidencia elegida</button>':'';
-  return '<div class="entry"><div class="bar"><label class="name"><input type="checkbox" data-row="'+i+'" '+(r.enabled?'checked':'')+'>'+esc(p.name)+'</label><small>'+esc(p.status==='ok'?'Publicado':'Borrador')+'</small><a href="/admin/editor?slug='+encodeURIComponent(p.slug||'')+'" target="_blank" rel="noopener">Abrir editor</a><button type="button" data-auto="'+i+'" '+(running?'disabled':'')+'>🤖 Autocompletar este juego</button></div>'+(r.error?'<p class="danger">'+esc(r.error)+'</p>':'')+(r.proposed?'<p class="good">✓ Datos encontrados. Revisá y marcá los campos que quieras guardar.</p>':'')+feedback+options+(fieldsHtml?'<details open><summary>📝 Campos faltantes · automáticos o manuales ('+r.selected.size+' seleccionados)</summary><div>'+fieldsHtml+'</div></details>':'<p class="good">No hay campos pendientes en esta ficha.</p>')+'</div>';
+  return '<div class="entry"><div class="bar"><label class="name"><input type="checkbox" data-row="'+i+'" '+(r.enabled?'checked':'')+'>'+esc(p.name)+'</label><small>'+esc(p.status==='ok'?'Publicado':'Borrador')+'</small><a href="/admin/editor?slug='+encodeURIComponent(p.slug||'')+'" target="_blank" rel="noopener">Abrir editor</a><button type="button" data-auto="'+i+'" '+(running?'disabled':'')+'>🤖 Autocompletar este juego</button></div>'+(r.error?'<p class="danger">'+esc(r.error)+'</p>':'')+(r.proposed?'<p class="good">✓ Datos encontrados. Revisá y marcá los campos que quieras guardar.</p>':'')+feedback+storageLookup+options+(fieldsHtml?'<details open><summary>📝 Campos faltantes · automáticos o manuales ('+r.selected.size+' seleccionados)</summary><div>'+fieldsHtml+'</div></details>':'<p class="good">No hay campos pendientes en esta ficha.</p>')+'</div>';
  }).join('');
  $('a51-enrich-search').disabled=running||!rows.length;
  $('a51-enrich-save').disabled=running||!rows.some(r=>hasApproved(r));
@@ -104,6 +105,21 @@ async function detail(i){
  }catch(e){r.proposed=null;r.error='No se pudo obtener la ficha: '+e.message;}
  finally{running=false;status('Revisión lista. Marcá solo los campos que aprobás.');render();}
 }
+async function lookupStorage(i){
+ const r=rows[i];if(!r||running||clean(r.raw.size))return;
+ running=true;render();status('🔎 Consultando fuente secundaria GOG para '+r.raw.name+'…');
+ try{
+  const response=await fetch('/api/a51-storage-secondary?q='+encodeURIComponent(r.raw.name));
+  const result=await response.json();if(!response.ok)throw Error(result.error||'Error de consulta');
+  r.secondary=result;
+  if(result.verified&&/^\\d+(?:\\.\\d+)? (?:GB|MB|TB)$/.test(result.size)){
+   r.proposed=r.proposed||{};
+   if(!clean(r.proposed.size))r.proposed.size=result.size;
+   status('✓ GOG encontró espacio requerido: '+result.size+'. Revisá y marcá el campo para guardar.');
+  }else status('🟡 GOG no aportó un valor verificable: '+(result.reason||'sin datos')+'. No se inventó ningún tamaño.');
+ }catch(e){r.secondary={verified:false,reason:'Error consultando GOG'};status('⚠ No se pudo consultar GOG. No se modificó ningún dato.');console.error(e);}
+ finally{running=false;render();}
+}
 async function save(){
  if(running)return;
  const selected=rows.filter(r=>hasApproved(r));if(!selected.length)return;
@@ -162,7 +178,7 @@ async function init(){
    if(checkbox){checkbox.disabled=!proposedValue(r,col,fields.find(f=>f[0]===col)[2]);if(checkbox.disabled){checkbox.checked=false;r.selected.delete(col);}}
    $('a51-enrich-save').disabled=running||!rows.some(x=>hasApproved(x));
   });
-  $('a51-enrich-list').addEventListener('click',e=>{const auto=e.target.closest('[data-auto]');if(auto){autoOne(Number(auto.dataset.auto));return;}const b=e.target.closest('[data-detail]');if(b)detail(Number(b.dataset.detail));});
+  $('a51-enrich-list').addEventListener('click',e=>{const storage=e.target.closest('[data-storage]');if(storage){lookupStorage(Number(storage.dataset.storage));return;}const auto=e.target.closest('[data-auto]');if(auto){autoOne(Number(auto.dataset.auto));return;}const b=e.target.closest('[data-detail]');if(b)detail(Number(b.dataset.detail));});
   status('Listo. Cargá un lote de fichas incompletas.');
  }catch(e){console.error(e);status('No se pudo iniciar el módulo.');}
 }
