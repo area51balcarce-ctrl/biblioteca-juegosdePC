@@ -112,7 +112,7 @@ async function lookupStorage(i){
   const response=await fetch('/api/a51-storage-secondary?q='+encodeURIComponent(r.raw.name));
   const result=await response.json();if(!response.ok)throw Error(result.error||'Error de consulta');
   r.secondary=result;
-  if(result.verified&&/^\\d+(?:\\.\\d+)? (?:GB|MB|TB)$/.test(result.size)){
+  if(result.verified&&/^\d+(?:\.\d+)? (?:GB|MB|TB)$/.test(result.size)){
    r.proposed=r.proposed||{};
    if(!clean(r.proposed.size))r.proposed.size=result.size;
    status('✓ GOG encontró espacio requerido: '+result.size+'. Revisá y marcá el campo para guardar.');
