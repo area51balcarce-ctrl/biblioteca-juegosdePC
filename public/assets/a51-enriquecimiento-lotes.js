@@ -109,7 +109,7 @@ async function lookupStorage(i){
  const r=rows[i];if(!r||running||clean(r.raw.size))return;
  running=true;render();status('🔎 Consultando fuente secundaria GOG para '+r.raw.name+'…');
  try{
-  const response=await fetch('/api/a51-storage-secondary?q='+encodeURIComponent(r.raw.name));
+  const response=await fetch('/api/igdb-data-v2?mode=storage-secondary&q='+encodeURIComponent(r.raw.name));
   const result=await response.json();if(!response.ok)throw Error(result.error||'Error de consulta');
   r.secondary=result;
   if(result.verified&&/^\d+(?:\.\d+)? (?:GB|MB|TB)$/.test(result.size)){
