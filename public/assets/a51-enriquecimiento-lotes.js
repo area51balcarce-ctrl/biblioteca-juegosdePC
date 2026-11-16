@@ -8,6 +8,7 @@ const status=t=>$('a51-enrich-status').textContent=t;
 function incomplete(r){return fields.some(([col])=>!clean(r[col]));}
 function candidate(r){return {raw:r,match:null,proposed:null,manual:{},secondary:null,selected:new Set(),error:'',searchResults:[],busy:false,enabled:true};}
 function proposedValue(r,col,key){return clean(r.manual[col])||clean(r.proposed?.[key]);}
+function selectAvailable(r){for(const [col,,key] of fields){if(!clean(r.raw[col])&&proposedValue(r,col,key))r.selected.add(col);}}
 function hasApproved(r){return [...r.selected].some(col=>{const f=fields.find(x=>x[0]===col);return f&&!clean(r.raw[col])&&proposedValue(r,col,f[2]);});}
 function render(){
  $('a51-enrich-count').textContent=rows.length+' fichas cargadas · '+rows.filter(r=>r.proposed).length+' con vista previa';
@@ -87,8 +88,9 @@ async function autoOne(i){
   const detailData=await detailResponse.json();if(!detailResponse.ok)throw Error(detailData.error||'Error de detalles');
   if(!detailData.product?.name||norm(detailData.product.name)!==norm(exact[0].name))throw Error('La respuesta no coincide con el juego elegido');
   r.proposed=detailData.product;
+  selectAvailable(r);
   r.error=detailData.product.updateMeta?.hasSteamData?'':'IGDB encontró el juego, pero Steam no aportó datos adicionales.';
-  status('✓ Vista previa automática lista para '+r.raw.name+'. Marcá los campos que quieras guardar.');
+  status('✓ Vista previa automática lista para '+r.raw.name+'. Los campos encontrados quedaron preseleccionados; revisalos antes de guardar.');
  }catch(e){r.error='No se pudo autocompletar: '+e.message;status('⚠ '+r.error);}
  finally{running=false;render();}
 }
@@ -100,10 +102,10 @@ async function detail(i){
   if(!data.product?.name)throw Error('Respuesta sin nombre');
   const selected=r.searchResults.find(x=>String(x.id)===r.match);
   if(!selected||norm(data.product.name)!==norm(selected.name))throw Error('El resultado no coincide con la selección');
-  r.proposed=data.product;r.selected.clear();r.error='';
+  r.proposed=data.product;r.selected.clear();selectAvailable(r);r.error='';
   if(!data.product.updateMeta?.hasSteamData)r.error='IGDB respondió, pero Steam no aportó datos. Revisá la información disponible.';
  }catch(e){r.proposed=null;r.error='No se pudo obtener la ficha: '+e.message;}
- finally{running=false;status('Revisión lista. Marcá solo los campos que aprobás.');render();}
+ finally{running=false;status('Revisión lista. Los campos disponibles quedaron preseleccionados; podés desmarcar cualquiera antes de guardar.');render();}
 }
 async function lookupStorage(i){
  const r=rows[i];if(!r||running||clean(r.raw.size))return;
@@ -115,7 +117,8 @@ async function lookupStorage(i){
   if(result.verified&&/^\d+(?:\.\d+)? (?:GB|MB|TB)$/.test(result.size)){
    r.proposed=r.proposed||{};
    if(!clean(r.proposed.size))r.proposed.size=result.size;
-   status('✓ '+(result.source||'Fuente secundaria')+' encontró espacio requerido: '+result.size+'. Revisá y marcá el campo para guardar.');
+   r.selected.add('size');
+   status('✓ '+(result.source||'Fuente secundaria')+' encontró espacio requerido: '+result.size+'. Campo preseleccionado; revisalo antes de guardar.');
   }else status('🟡 No se encontró un valor verificable: '+(result.reason||'sin datos')+'. No se inventó ningún tamaño.');
  }catch(e){r.secondary={verified:false,reason:'Error consultando GOG'};status('⚠ No se pudo consultar la fuente secundaria. No se modificó ningún dato.');console.error(e);}
  finally{running=false;render();}
@@ -173,9 +176,10 @@ async function init(){
    const i=Number(t.dataset.manual),col=t.dataset.field,r=rows[i];
    if(!r||!fields.some(f=>f[0]===col)||clean(r.raw[col]))return;
    r.manual[col]=t.value;
+   if(clean(t.value))r.selected.add(col);else if(!clean(r.proposed?.[fields.find(f=>f[0]===col)[2]]))r.selected.delete(col);
    // No redibujar mientras escribe: conservar foco, cursor y texto.
    const checkbox=$('a51-enrich-list').querySelector('input[data-i="'+i+'"][data-col="'+col+'"]');
-   if(checkbox){checkbox.disabled=!proposedValue(r,col,fields.find(f=>f[0]===col)[2]);if(checkbox.disabled){checkbox.checked=false;r.selected.delete(col);}}
+   if(checkbox){checkbox.disabled=!proposedValue(r,col,fields.find(f=>f[0]===col)[2]);checkbox.checked=r.selected.has(col);if(checkbox.disabled){checkbox.checked=false;r.selected.delete(col);}}
    $('a51-enrich-save').disabled=running||!rows.some(x=>hasApproved(x));
   });
   $('a51-enrich-list').addEventListener('click',e=>{const storage=e.target.closest('[data-storage]');if(storage){lookupStorage(Number(storage.dataset.storage));return;}const auto=e.target.closest('[data-auto]');if(auto){autoOne(Number(auto.dataset.auto));return;}const b=e.target.closest('[data-detail]');if(b)detail(Number(b.dataset.detail));});
