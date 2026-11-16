@@ -288,6 +288,7 @@ async function a51_discoverBatch(req,res){
 }
 
 module.exports = async function handler(req, res){
+  if(req.query?.mode === 'storage-secondary') return require('../lib/a51-storage-secondary.js')(req,res);
   if(req.query?.mode === 'import-discover-batch') return a51_discoverBatch(req,res);
   if(req.query?.mode === 'import-discover') return a51_discoverPreview(req,res);
   if(req.query?.mode === 'import-preview') return a51_importPreview(req,res);
